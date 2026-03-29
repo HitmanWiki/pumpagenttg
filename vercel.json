@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-fees",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-marketcap",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

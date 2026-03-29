@@ -1,0 +1,146 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon requires this for connection pooling on serverless
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  telegramId          BigInt   @unique @map("telegram_id")
+  telegramUsername    String?  @map("telegram_username")
+  telegramFirstName   String?  @map("telegram_first_name")
+  telegramLastName    String?  @map("telegram_last_name")
+  telegramPhotoUrl    String?  @map("telegram_photo_url")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  tokens Token[]
+  claims Claim[]
+
+  @@map("users")
+}
+
+model Token {
+  id          String @id @default(cuid())
+  userId      String @map("user_id")
+
+  // Token metadata
+  name        String
+  symbol      String
+  description String?
+  imageUrl    String? @map("image_url")
+  website     String?
+
+  // On-chain data
+  mintAddress          String  @unique @map("mint_address")
+  tokenWalletAddress   String  @map("token_wallet_address")
+  tokenWalletPrivKey   String  @map("token_wallet_priv_key") // encrypted bs58
+  deployTx             String? @map("deploy_tx")
+
+  // pump.fun
+  pumpFunUrl      String? @map("pump_fun_url")
+  marketCapUsd    Float   @default(0) @map("market_cap_usd")
+  volume24hUsd    Float   @default(0) @map("volume_24h_usd")
+
+  // Fees (stored in lamports for precision)
+  totalFeesEarnedLamports  BigInt @default(0) @map("total_fees_earned_lamports")
+  claimableFeesLamports    BigInt @default(0) @map("claimable_fees_lamports")
+
+  // Status
+  status TokenStatus @default(LIVE)
+
+  // Telegram context
+  telegramChatId    BigInt? @map("telegram_chat_id")
+  telegramMessageId BigInt? @map("telegram_message_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claims Claim[]
+  campaignWins Campaign[] @relation("CampaignWinner")
+
+  @@index([userId])
+  @@index([marketCapUsd(sort: Desc)])
+  @@map("tokens")
+}
+
+model Claim {
+  id      String @id @default(cuid())
+  tokenId String @map("token_id")
+  userId  String @map("user_id")
+
+  amountLamports        BigInt @map("amount_lamports")
+  platformFeeLamports   BigInt @map("platform_fee_lamports")
+  netAmountLamports     BigInt @map("net_amount_lamports")
+
+  destinationWallet String      @map("destination_wallet")
+  txSignature       String?     @map("tx_signature")
+  status            ClaimStatus @default(PENDING)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  token Token @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenId])
+  @@index([userId])
+  @@map("claims")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+
+  goalType  GoalType @default(MARKET_CAP) @map("goal_type")
+  goalValue Float    @map("goal_value")
+
+  prizeUsd         Float   @map("prize_usd")
+  prizeDescription String? @map("prize_description")
+
+  winnerTokenId String? @map("winner_token_id")
+  winnerPaidAt  DateTime? @map("winner_paid_at")
+
+  status   CampaignStatus @default(ACTIVE)
+  startsAt DateTime       @default(now()) @map("starts_at")
+  endsAt   DateTime?      @map("ends_at")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  winnerToken Token? @relation("CampaignWinner", fields: [winnerTokenId], references: [id])
+
+  @@map("campaigns")
+}
+
+enum TokenStatus {
+  PENDING
+  LIVE
+  GRADUATED
+  FAILED
+}
+
+enum ClaimStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum GoalType {
+  MARKET_CAP
+  VOLUME
+}
+
+enum CampaignStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}

@@ -1,0 +1,22 @@
+// src/app/layout.tsx
+import type { Metadata } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import './globals.css'
+
+const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
+const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'Pump Agent — Launch Tokens with Telegram',
+  description: 'Launch meme tokens on pump.fun directly from Telegram. Earn 90% of trading fees.',
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className="dark">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#080c0a] text-white min-h-screen`}>
+        {children}
+      </body>
+    </html>
+  )
+}
