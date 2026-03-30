@@ -1,12 +1,16 @@
+// src/app/login/page.tsx
 'use client'
+
 import { useEffect, useState } from 'react'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [botUsername, setBotUsername] = useState('')
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
+    
     // Check if already logged in
     const token = localStorage.getItem('auth_token')
     if (token) {
@@ -15,30 +19,17 @@ export default function LoginPage() {
     }
 
     // Get bot username from env
-    const bot = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
-    setBotUsername(bot)
-    console.log('[Login] Using bot username:', bot)
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
+    console.log('[Login] Using bot username:', botUsername)
 
-    // Check if the Telegram widget is available
-    const checkWidget = setInterval(() => {
-      const widget = document.querySelector('.telegram-login-widget')
-      if (widget) {
-        console.log('[Login] Widget loaded')
-        clearInterval(checkWidget)
-      }
-    }, 500)
-
-    // Load Telegram widget script
+    // Load Telegram widget
     const script = document.createElement('script')
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
     script.async = true
-    script.onload = () => {
-      console.log('[Login] Telegram script loaded')
-    }
-    script.onerror = () => {
-      console.error('[Login] Failed to load Telegram script')
-      setError('Failed to load login widget. Please try refreshing the page.')
-    }
+    script.setAttribute('data-telegram-login', botUsername)
+    script.setAttribute('data-size', 'large')
+    script.setAttribute('data-request-access', 'write')
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
     
     const container = document.getElementById('telegram-login-widget')
     if (container) {
@@ -46,15 +37,9 @@ export default function LoginPage() {
       container.appendChild(script)
     }
 
-    return () => {
-      clearInterval(checkWidget)
-    }
-  }, [])
-
-  // Set up callback after script loads
-  useEffect(() => {
+    // Define callback
     window.onTelegramAuth = async (user: any) => {
-      console.log('[Login] Telegram user received:', user)
+      console.log('[Login] Telegram user:', user)
       setLoading(true)
       setError(null)
       
@@ -88,13 +73,9 @@ export default function LoginPage() {
     }
   }, [])
 
-  // Create the login URL directly
-  const directLoginUrl = `https://oauth.telegram.org/auth?bot_id=${getBotId(botUsername)}&origin=${encodeURIComponent(window.location.origin)}&embed=1&request_access=write`
-
-  function getBotId(username: string): string {
-    // You need to get your bot ID from BotFather
-    // For now, use a fallback
-    return '8739575671' // This is your bot ID from the token: 8739575671:AAHVNp71hKqZ-FN4jP-No9vqx3YQu3h689A
+  // Don't render on server
+  if (!mounted) {
+    return null
   }
 
   return (
@@ -148,36 +129,29 @@ export default function LoginPage() {
             </button>
           </div>
         ) : (
-          <>
-            {/* Telegram Widget Container */}
-            <div id="telegram-login-widget" className="flex justify-center"></div>
-            
-            {/* Fallback Button */}
-            <div style={{ marginTop: '1.5rem' }}>
-              <p style={{ color: '#555', marginBottom: '1rem' }}>Or</p>
-              <a 
-                href="https://t.me/pumpagenttg_bot" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{
-                  display: 'inline-block',
-                  padding: '0.75rem 1.5rem',
-                  background: '#00C896',
-                  color: '#000',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 'bold',
-                  marginBottom: '1rem'
-                }}
-              >
-                Open Bot on Telegram
-              </a>
-              <p style={{ color: '#555', fontSize: '0.75rem' }}>
-                After opening the bot, type <code style={{ background: '#222', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>/start</code> to begin
-              </p>
-            </div>
-          </>
+          <div id="telegram-login-widget" className="flex justify-center"></div>
         )}
+        
+        {/* Fallback button */}
+        <div style={{ marginTop: '1.5rem' }}>
+          <p style={{ color: '#555', marginBottom: '1rem' }}>Or</p>
+          <a 
+            href="https://t.me/pumpagenttg_bot" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block',
+              padding: '0.75rem 1.5rem',
+              background: '#00C896',
+              color: '#000',
+              textDecoration: 'none',
+              borderRadius: '8px',
+              fontWeight: 'bold'
+            }}
+          >
+            Open Bot on Telegram
+          </a>
+        </div>
         
         <p style={{ color: '#555', marginTop: '2rem', fontSize: '0.875rem' }}>
           By logging in, you agree to our Terms of Service
