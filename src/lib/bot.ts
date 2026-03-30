@@ -12,6 +12,30 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN)
 
+// Initialize bot info (required for serverless environments)
+// This fetches bot info from Telegram API
+let botInitialized = false
+
+async function ensureBotInitialized() {
+  if (!botInitialized) {
+    try {
+      console.log('[Bot] Initializing bot...')
+      await bot.init()
+      botInitialized = true
+      console.log('[Bot] Bot initialized successfully:', bot.botInfo?.username)
+    } catch (error) {
+      console.error('[Bot] Failed to initialize:', error)
+      throw error
+    }
+  }
+}
+
+// Middleware to ensure bot is initialized before handling updates
+bot.use(async (ctx, next) => {
+  await ensureBotInitialized()
+  await next()
+})
+
 // ============================================================
 // Middleware & Error Handling
 // ============================================================
@@ -352,7 +376,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       imageBuffer,
       imageFileName: `${tokenSymbol.toLowerCase()}.png`,
       mintKeypair,
-      devBuySol: 0, // no dev buy — creator decides
+      devBuySol: 0,
     })
 
     if (!deployResult.success) {
@@ -417,4 +441,5 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
   }
 }
 
+// Export the bot (will be initialized on first use via middleware)
 export default bot
