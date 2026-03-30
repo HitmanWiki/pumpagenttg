@@ -12,36 +12,37 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN)
 
-// Initialize bot info (required for serverless environments)
-// This fetches bot info from Telegram API
-let botInitialized = false
+// Initialize bot immediately (not lazy)
+let initializationPromise: Promise<void> | null = null
 
-async function ensureBotInitialized() {
-  if (!botInitialized) {
-    try {
-      console.log('[Bot] Initializing bot...')
-      await bot.init()
-      botInitialized = true
-      console.log('[Bot] Bot initialized successfully:', bot.botInfo?.username)
-    } catch (error) {
-      console.error('[Bot] Failed to initialize:', error)
-      throw error
-    }
+async function initBot() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      try {
+        console.log('[Bot] Initializing bot...')
+        await bot.init()
+        console.log('[Bot] Bot initialized successfully:', bot.botInfo?.username)
+      } catch (error) {
+        console.error('[Bot] Failed to initialize:', error)
+        throw error
+      }
+    })()
   }
+  return initializationPromise
 }
 
-// Middleware to ensure bot is initialized before handling updates
-bot.use(async (ctx, next) => {
-  await ensureBotInitialized()
-  await next()
-})
+// Start initialization immediately (don't wait for first request)
+initBot().catch(console.error)
 
 // ============================================================
 // Middleware & Error Handling
 // ============================================================
 
-// Log all updates for debugging
+// Log all updates for debugging (after init)
 bot.use(async (ctx, next) => {
+  // Ensure bot is initialized (should already be, but just in case)
+  await initBot()
+  
   console.log('[Bot] Update received:', {
     type: ctx.update.message ? 'message' : 
           ctx.update.callback_query ? 'callback' : 
@@ -441,5 +442,5 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
   }
 }
 
-// Export the bot (will be initialized on first use via middleware)
+// Export the bot (initialization already started)
 export default bot
