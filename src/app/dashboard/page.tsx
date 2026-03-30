@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import Footer from '../components/Footer'
 
@@ -10,6 +11,7 @@ function usd(s: number) { return (s * SOL_USD).toFixed(2) }
 function shortAddr(a: string) { return a ? `${a.slice(0,8)}...${a.slice(-6)}` : '' }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [user, setUser]       = useState<any>(null)
   const [data, setData]       = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -18,27 +20,102 @@ export default function DashboardPage() {
   const [msg, setMsg]         = useState('')
   const [copied, setCopied]   = useState('')
 
-  useEffect(() => { fetchAll() }, [])
+  // Get auth token from localStorage
+  const getAuthToken = () => localStorage.getItem('auth_token')
+
+  useEffect(() => { 
+    checkAuth() 
+  }, [])
+
+  async function checkAuth() {
+    const token = getAuthToken()
+    if (!token) {
+      router.push('/')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        setUser(data.user)
+        await fetchAll()
+      } else {
+        // Token invalid, clear storage and redirect
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
+        router.push('/')
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      router.push('/')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function fetchAll() {
+    const token = getAuthToken()
+    if (!token) return
+    
     setLoading(true)
-    const [meRes, tokRes] = await Promise.all([fetch('/api/auth/me'), fetch('/api/tokens')])
-    if (meRes.ok) setUser((await meRes.json()).user)
-    if (tokRes.ok) setData(await tokRes.json())
-    setLoading(false)
+    try {
+      const [meRes, tokRes] = await Promise.all([
+        fetch('/api/auth/me', { 
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/tokens', { 
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ])
+      
+      if (meRes.ok) {
+        const meData = await meRes.json()
+        setUser(meData.user)
+      }
+      
+      if (tokRes.ok) {
+        const tokData = await tokRes.json()
+        setData(tokData)
+      }
+    } catch (error) {
+      console.error('Fetch error:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleClaim() {
+    const token = getAuthToken()
+    if (!token) {
+      setMsg('Please login again')
+      router.push('/')
+      return
+    }
+    
     if (!destWallet) return setMsg('Enter your Solana wallet address')
     setClaiming(true); setMsg('')
-    const res = await fetch('/api/fees/claim', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ destinationWallet: destWallet }),
-    })
-    const json = await res.json()
-    setMsg(res.ok ? '✅ Fees claimed successfully!' : `❌ ${json.error}`)
-    if (res.ok) fetchAll()
-    setClaiming(false)
+    
+    try {
+      const res = await fetch('/api/fees/claim', {
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ destinationWallet: destWallet }),
+      })
+      const json = await res.json()
+      setMsg(res.ok ? '✅ Fees claimed successfully!' : `❌ ${json.error}`)
+      if (res.ok) fetchAll()
+    } catch (error) {
+      setMsg('❌ Network error. Please try again.')
+    } finally {
+      setClaiming(false)
+    }
   }
 
   function copy(text: string, key: string) {
@@ -49,8 +126,8 @@ export default function DashboardPage() {
 
   const stats    = data?.stats || {}
   const tokens   = data?.tokens || []
-  const claimSol = Number(stats.claimableFeeSol || 0)
-  const earnSol  = Number(stats.totalEarnedSol || 0)
+  const claimSol = Number(stats.claimableFeeSol || stats.claimableFeesLamports / 1e9 || 0)
+  const earnSol  = Number(stats.totalEarnedSol || stats.totalEarnedLamports / 1e9 || 0)
   const afterFee = claimSol * 0.9
   const needMore = Math.max(0, 0.1 - claimSol).toFixed(4)
 
@@ -174,7 +251,7 @@ export default function DashboardPage() {
                 <div className="empty-icon">🚀</div>
                 <div className="empty-title">No tokens yet</div>
                 <div className="empty-sub">Launch your first token via Telegram to get started</div>
-                <a href={`https://t.me/${process.env.TELEGRAM_BOT_USERNAME||'YourBot'}`} target="_blank" rel="noopener noreferrer" className="btn-primary">Open Telegram Bot</a>
+                <a href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'}`} target="_blank" rel="noopener noreferrer" className="btn-primary">Open Telegram Bot</a>
               </div>
             ) : (
               <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'1rem'}}>
@@ -223,4 +300,3 @@ function TokenCard({ token, onCopy, copied }: { token:any; onCopy:(t:string,k:st
     </Link>
   )
 }
-
