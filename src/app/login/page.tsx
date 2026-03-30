@@ -10,25 +10,17 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if already logged in
-    const savedToken = localStorage.getItem('auth_token')
-    if (savedToken) {
-      fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${savedToken}` }
-      }).then(res => {
-        if (res.ok) {
-          router.push('/dashboard')
-        } else {
-          localStorage.removeItem('auth_token')
-          localStorage.removeItem('auth_user')
-        }
-      }).catch(console.error)
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      router.push('/dashboard')
+      return
     }
 
     // Load Telegram Login Widget
     const script = document.createElement('script')
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
     script.async = true
-    script.setAttribute('data-telegram-login', process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot')
+    script.setAttribute('data-telegram-login', process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot')
     script.setAttribute('data-size', 'large')
     script.setAttribute('data-request-access', 'write')
     script.setAttribute('data-onauth', 'onTelegramAuth(user)')
@@ -39,15 +31,7 @@ export default function LoginPage() {
       container.appendChild(script)
     }
 
-    return () => {
-      if (container && script.parentNode) {
-        script.parentNode.removeChild(script)
-      }
-    }
-  }, [router])
-
-  // Setup Telegram callback
-  useEffect(() => {
+    // Define the callback function globally
     window.onTelegramAuth = async (user: any) => {
       console.log('[Login] Telegram user:', user)
       setLoading(true)
@@ -63,12 +47,12 @@ export default function LoginPage() {
         const data = await response.json()
         console.log('[Login] Auth response:', data)
         
-        if (response.ok && data.success && data.token) {
-          // Store token in localStorage
+        if (response.ok && data.token) {
+          // Store token
           localStorage.setItem('auth_token', data.token)
           localStorage.setItem('auth_user', JSON.stringify(data.user))
           
-          // Force redirect
+          // Redirect to dashboard
           window.location.href = '/dashboard'
         } else {
           setError(data.error || 'Login failed')
@@ -82,9 +66,12 @@ export default function LoginPage() {
     }
 
     return () => {
+      if (container && script.parentNode) {
+        script.parentNode.removeChild(script)
+      }
       window.onTelegramAuth = undefined
     }
-  }, [])
+  }, [router])
 
   return (
     <div style={{ 

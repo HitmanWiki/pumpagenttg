@@ -21,7 +21,12 @@ export default function DashboardPage() {
   const [copied, setCopied]   = useState('')
 
   // Get auth token from localStorage
-  const getAuthToken = () => localStorage.getItem('auth_token')
+  const getAuthToken = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('auth_token')
+    }
+    return null
+  }
 
   useEffect(() => { 
     checkAuth() 
@@ -29,9 +34,11 @@ export default function DashboardPage() {
 
   async function checkAuth() {
     const token = getAuthToken()
+    console.log('[Dashboard] Checking auth, token exists:', !!token)
+    
     if (!token) {
       console.log('[Dashboard] No token found, redirecting to login')
-      router.push('/')
+      window.location.href = '/login'
       return
     }
 
@@ -40,8 +47,11 @@ export default function DashboardPage() {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       
+      console.log('[Dashboard] Auth/me response status:', res.status)
+      
       if (res.ok) {
         const data = await res.json()
+        console.log('[Dashboard] User data:', data.user?.telegramUsername)
         setUser(data.user)
         await fetchAll()
       } else {
@@ -49,59 +59,50 @@ export default function DashboardPage() {
         console.log('[Dashboard] Token invalid, clearing storage')
         localStorage.removeItem('auth_token')
         localStorage.removeItem('auth_user')
-        router.push('/')
+        window.location.href = '/login'
       }
     } catch (error) {
       console.error('Auth check failed:', error)
-      router.push('/')
+      window.location.href = '/login'
     } finally {
       setLoading(false)
     }
   }
 
-  // src/app/dashboard/page.tsx - Update the fetchAll function
-async function fetchAll() {
-  const token = getAuthToken()
-  if (!token) return
-  
-  setLoading(true)
-  try {
-    const [meRes, tokRes] = await Promise.all([
-      fetch('/api/auth/me', { 
-        headers: { 'Authorization': `Bearer ${token}` }
-      }),
-      fetch('/api/tokens', { 
+  async function fetchAll() {
+    const token = getAuthToken()
+    if (!token) return
+    
+    setLoading(true)
+    try {
+      const tokRes = await fetch('/api/tokens', { 
         headers: { 'Authorization': `Bearer ${token}` }
       })
-    ])
-    
-    console.log('[Dashboard] Auth/me status:', meRes.status)
-    console.log('[Dashboard] Tokens status:', tokRes.status)
-    
-    if (meRes.ok) {
-      const meData = await meRes.json()
-      setUser(meData.user)
-    } else {
-      const errorText = await meRes.text()
-      console.log('[Dashboard] Auth/me error:', errorText)
+      
+      console.log('[Dashboard] Tokens response status:', tokRes.status)
+      
+      if (tokRes.ok) {
+        const tokData = await tokRes.json()
+        console.log('[Dashboard] Tokens count:', tokData.tokens?.length || 0)
+        setData(tokData)
+      } else if (tokRes.status === 401) {
+        console.log('[Dashboard] Token expired, redirecting')
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
+        window.location.href = '/login'
+      }
+    } catch (error) {
+      console.error('Fetch error:', error)
+    } finally {
+      setLoading(false)
     }
-    
-    if (tokRes.ok) {
-      const tokData = await tokRes.json()
-      setData(tokData)
-    }
-  } catch (error) {
-    console.error('Fetch error:', error)
-  } finally {
-    setLoading(false)
   }
-}
 
   async function handleClaim() {
     const token = getAuthToken()
     if (!token) {
       setMsg('Please login again')
-      setTimeout(() => router.push('/'), 1500)
+      setTimeout(() => window.location.href = '/login', 1500)
       return
     }
     
@@ -140,16 +141,43 @@ async function fetchAll() {
   const afterFee = claimSol * 0.9
   const needMore = Math.max(0, 0.1 - claimSol).toFixed(4)
 
-  if (!loading && !user) return (
-    <><div className="grid-bg"/><div className="page"><Nav/>
-      <div className="empty-state">
-        <div className="empty-icon">🔒</div>
-        <div className="empty-title">Sign in required</div>
-        <div className="empty-sub">Connect with Telegram to view your dashboard</div>
-        <Link href="/login" className="btn-primary">← Go to Login</Link>
-      </div>
-    <Footer/></div></>
-  )
+  // Show loading state
+  if (loading) {
+    return (
+      <>
+        <div className="grid-bg"/>
+        <div className="page">
+          <Nav/>
+          <div className="flex justify-center items-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="spinner mb-4"></div>
+              <p className="text-gray-400">Loading dashboard...</p>
+            </div>
+          </div>
+          <Footer/>
+        </div>
+      </>
+    )
+  }
+
+  // Show login required state
+  if (!loading && !user) {
+    return (
+      <>
+        <div className="grid-bg"/>
+        <div className="page">
+          <Nav/>
+          <div className="empty-state">
+            <div className="empty-icon">🔒</div>
+            <div className="empty-title">Sign in required</div>
+            <div className="empty-sub">Connect with Telegram to view your dashboard</div>
+            <Link href="/login" className="btn-primary">← Go to Login</Link>
+          </div>
+          <Footer/>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
@@ -251,16 +279,12 @@ async function fetchAll() {
               <span className="mono text-dimmer" style={{fontSize:'0.75rem'}}>Click any token to view details</span>
             </div>
 
-            {loading ? (
-              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'1rem'}}>
-                {[1,2].map(i=><div key={i} className="card card-inner"><div className="skeleton" style={{height:120}}/></div>)}
-              </div>
-            ) : tokens.length === 0 ? (
+            {tokens.length === 0 ? (
               <div className="empty-state card">
                 <div className="empty-icon">🚀</div>
                 <div className="empty-title">No tokens yet</div>
                 <div className="empty-sub">Launch your first token via Telegram to get started</div>
-                <a href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'}`} target="_blank" rel="noopener noreferrer" className="btn-primary">Open Telegram Bot</a>
+                <a href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'}`} target="_blank" rel="noopener noreferrer" className="btn-primary">Open Telegram Bot</a>
               </div>
             ) : (
               <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'1rem'}}>

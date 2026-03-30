@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import './globals.css'
 
-const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
 
 // Add TypeScript declaration for window.onTelegramAuth
 declare global {
