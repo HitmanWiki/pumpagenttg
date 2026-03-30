@@ -2,6 +2,7 @@
 import { Bot, Context, InputFile } from 'grammy'
 import { Keypair } from '@solana/web3.js'
 import { deployToken, generateTokenWallet } from './solana'
+import { signSession } from './auth'
 import prisma from './prisma'
 
 // Check if bot token exists
@@ -65,12 +66,94 @@ bot.catch((err) => {
 })
 
 // ============================================================
-// /start command
+// /start command with login support
 // ============================================================
 bot.command('start', async (ctx) => {
   console.log('[Bot] /start command from:', ctx.from?.username)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
+  const text = ctx.message?.text || ''
+  const args = text.split(' ')
   
+  // Check if it's a login request (format: /start login_123456789)
+  if (args.length > 1 && args[1].startsWith('login_')) {
+    const loginId = args[1].replace('login_', '')
+    console.log('[Bot] Login request with ID:', loginId)
+    
+    const telegramUser = ctx.from
+    if (!telegramUser) {
+      return ctx.reply('❌ Error: Could not identify your account.')
+    }
+    
+    try {
+      // Find or create user
+      const user = await prisma.user.upsert({
+        where: { telegramId: BigInt(telegramUser.id) },
+        update: {
+          telegramUsername: telegramUser.username || null,
+          telegramFirstName: telegramUser.first_name || null,
+          telegramLastName: telegramUser.last_name || null,
+        },
+        create: {
+          telegramId: BigInt(telegramUser.id),
+          telegramUsername: telegramUser.username || null,
+          telegramFirstName: telegramUser.first_name || null,
+          telegramLastName: telegramUser.last_name || null,
+        },
+      })
+      
+      console.log('[Bot] User found/created:', user.id)
+      
+      // Create session token
+      const sessionToken = await signSession({
+        id: user.id,
+        telegramId: user.telegramId,
+        telegramUsername: user.telegramUsername,
+        telegramFirstName: user.telegramFirstName,
+      })
+      
+      // Send login confirmation to web app
+      const response = await fetch(`${appUrl}/api/auth/check-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          loginId,
+          token: sessionToken,
+          user: {
+            id: user.id,
+            telegramId: user.telegramId.toString(),
+            telegramUsername: user.telegramUsername,
+            telegramFirstName: user.telegramFirstName,
+          }
+        })
+      })
+      
+      if (response.ok) {
+        await ctx.reply(
+          `✅ *Login successful!*\n\n` +
+          `You have been logged into Pump Agent.\n` +
+          `You can now close this chat and return to the dashboard.`,
+          { parse_mode: 'Markdown' }
+        )
+        console.log('[Bot] Login successful for user:', telegramUser.username)
+      } else {
+        await ctx.reply(
+          `❌ *Login failed*\n\n` +
+          `Something went wrong. Please try again from the website.`,
+          { parse_mode: 'Markdown' }
+        )
+      }
+    } catch (error) {
+      console.error('[Bot] Login error:', error)
+      await ctx.reply(
+        `❌ *Login failed*\n\n` +
+        `An error occurred. Please try again later.`,
+        { parse_mode: 'Markdown' }
+      )
+    }
+    return
+  }
+  
+  // Regular start message (no login)
   try {
     await ctx.reply(
       `👋 *Welcome to Pump Agent!*\n\n` +
