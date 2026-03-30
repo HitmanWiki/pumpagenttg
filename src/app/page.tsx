@@ -115,93 +115,6 @@ const TgIcon = () => (
   </svg>
 )
 
-// ── Telegram Login Component ──────────────────────────────────────────────────
-function TelegramLogin() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Check if already logged in
-    fetch('/api/auth/me')
-      .then(res => {
-        if (res.ok) {
-          router.push('/dashboard')
-        }
-      })
-      .catch(console.error)
-
-    // Setup Telegram login widget
-    const script = document.createElement('script')
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', BOT_USERNAME)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    
-    const container = document.getElementById('telegram-login-widget')
-    if (container) {
-      container.innerHTML = ''
-      container.appendChild(script)
-    }
-
-    return () => {
-      if (container && script.parentNode) {
-        script.parentNode.removeChild(script)
-      }
-      // Clean up the global callback
-      window.onTelegramAuth = undefined
-    }
-  }, [router])
-
-  // Global callback for Telegram login
-  useEffect(() => {
-    window.onTelegramAuth = async (user: any) => {
-      console.log('[Telegram] Auth callback received:', user)
-      setLoading(true)
-      setError(null)
-      
-      try {
-        const response = await fetch('/api/auth/telegram', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(user)
-        })
-        
-        const data = await response.json()
-        console.log('[Telegram] Auth response:', data)
-        
-        if (response.ok && data.success) {
-          // Wait a moment for cookie to be set
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 500)
-        } else {
-          setError(data.error || 'Login failed')
-          setLoading(false)
-        }
-      } catch (error) {
-        console.error('[Telegram] Login error:', error)
-        setError('Network error. Please try again.')
-        setLoading(false)
-      }
-    }
-
-    return () => {
-      window.onTelegramAuth = undefined
-    }
-  }, [router])
-
-  return (
-    <div className="telegram-login-container">
-      <div id="telegram-login-widget" className="flex justify-center"></div>
-      {loading && <p className="mt-4 text-center text-gray-400">Logging in...</p>}
-      {error && <p className="mt-4 text-center text-red-500">{error}</p>}
-    </div>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const tgLink = `https://t.me/${BOT_USERNAME}`
@@ -393,24 +306,24 @@ export default function HomePage() {
         </div>
 
         {/* CTA - Login Section */}
-<div className="cta-section">
-  <div className="cta-glow" />
-  <div style={{ position: 'relative' }}>
-    <div className="badge" style={{ marginBottom: '1.5rem' }}>
-      <span className="badge-dot" /> Get Started
-    </div>
-    <h2 className="cta-title">Sign in to access<br />your dashboard</h2>
-    <p className="cta-sub">Login with Telegram to view your tokens, track earnings, and claim fees.</p>
-    <div className="cta-btns" style={{ flexDirection: 'column', gap: '1.5rem' }}>
-      <Link href="/login" className="btn-primary" style={{ display: 'inline-block', padding: '0.75rem 2rem' }}>
-        Login with Telegram
-      </Link>
-      <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ marginTop: '0' }}>
-        <TgIcon /> Open Telegram Bot
-      </a>
-    </div>
-  </div>
-</div>
+        <div className="cta-section">
+          <div className="cta-glow" />
+          <div style={{ position: 'relative' }}>
+            <div className="badge" style={{ marginBottom: '1.5rem' }}>
+              <span className="badge-dot" /> Get Started
+            </div>
+            <h2 className="cta-title">Sign in to access<br />your dashboard</h2>
+            <p className="cta-sub">Login with Telegram to view your tokens, track earnings, and claim fees.</p>
+            <div className="cta-btns" style={{ flexDirection: 'column', gap: '1.5rem' }}>
+              <Link href="/login" className="btn-primary" style={{ display: 'inline-block', padding: '0.75rem 2rem' }}>
+                Login with Telegram
+              </Link>
+              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ marginTop: '0' }}>
+                <TgIcon /> Open Telegram Bot
+              </a>
+            </div>
+          </div>
+        </div>
 
         {/* Footer */}
         <div style={{ borderTop: '1px solid rgba(0,200,150,0.06)' }}>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 export default function LoginPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Check if already logged in
@@ -45,10 +46,12 @@ export default function LoginPage() {
     }
   }, [router])
 
+  // Setup Telegram callback
   useEffect(() => {
     window.onTelegramAuth = async (user: any) => {
       console.log('[Login] Telegram user:', user)
       setLoading(true)
+      setError(null)
       
       try {
         const response = await fetch('/api/auth/telegram', {
@@ -65,15 +68,15 @@ export default function LoginPage() {
           localStorage.setItem('auth_token', data.token)
           localStorage.setItem('auth_user', JSON.stringify(data.user))
           
-          // Redirect to dashboard
-          router.push('/dashboard')
+          // Force redirect
+          window.location.href = '/dashboard'
         } else {
-          alert(data.error || 'Login failed')
+          setError(data.error || 'Login failed')
           setLoading(false)
         }
       } catch (error) {
         console.error('[Login] Error:', error)
-        alert('Network error. Please try again.')
+        setError('Network error. Please try again.')
         setLoading(false)
       }
     }
@@ -81,7 +84,7 @@ export default function LoginPage() {
     return () => {
       window.onTelegramAuth = undefined
     }
-  }, [router])
+  }, [])
 
   return (
     <div style={{ 
@@ -90,15 +93,56 @@ export default function LoginPage() {
       alignItems: 'center', 
       justifyContent: 'center',
       background: '#000',
-      color: '#fff'
+      color: '#fff',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
-      <div style={{ textAlign: 'center' }}>
-        <h1 style={{ marginBottom: '2rem' }}>Pump Agent</h1>
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Pump Agent</h1>
+        <p style={{ color: '#888', marginBottom: '2rem' }}>Launch tokens on pump.fun directly from Telegram</p>
+        
         {loading ? (
-          <p>Logging in...</p>
+          <div>
+            <div style={{ 
+              width: '40px', 
+              height: '40px', 
+              border: '3px solid #00C896', 
+              borderTopColor: 'transparent', 
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 1rem'
+            }} />
+            <p>Logging in...</p>
+            <style>{`
+              @keyframes spin {
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        ) : error ? (
+          <div>
+            <p style={{ color: '#ff6b6b', marginBottom: '1rem' }}>{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#00C896',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#000',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              Try Again
+            </button>
+          </div>
         ) : (
           <div id="telegram-login-widget"></div>
         )}
+        
+        <p style={{ color: '#555', marginTop: '2rem', fontSize: '0.875rem' }}>
+          By logging in, you agree to our Terms of Service
+        </p>
       </div>
     </div>
   )
