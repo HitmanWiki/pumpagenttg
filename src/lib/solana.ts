@@ -42,6 +42,12 @@ export async function getSolBalance(publicKey: string): Promise<number> {
   }
 }
 
+// Helper function to convert Buffer to Blob
+function bufferToBlob(buffer: Buffer, mimeType: string): Blob {
+  const uint8Array = new Uint8Array(buffer)
+  return new Blob([uint8Array], { type: mimeType })
+}
+
 // ============================================================
 // PumpPortal Token Deployment
 // ============================================================
@@ -55,7 +61,7 @@ export interface DeployTokenParams {
   imageBuffer: Buffer
   imageFileName: string
   mintKeypair: Keypair
-  devBuySol?: number // optional dev buy in SOL, defaults to 0
+  devBuySol?: number
 }
 
 export interface DeployTokenResult {
@@ -73,9 +79,13 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
   } = params
 
   try {
+    console.log('[deployToken] Starting deployment for:', name, symbol)
+    
     // Step 1: Upload metadata + image to IPFS via pump.fun
     const formData = new FormData()
-    const imageBlob = new Blob([imageBuffer], { type: 'image/png' })
+    
+    // Convert Buffer to Blob using helper
+    const imageBlob = bufferToBlob(imageBuffer, 'image/png')
     formData.append('file', imageBlob, imageFileName)
     formData.append('name', name)
     formData.append('symbol', symbol)
@@ -84,69 +94,88 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     if (website) formData.append('website', website)
     formData.append('showName', 'true')
 
+    console.log('[deployToken] Uploading to IPFS...')
     const ipfsResponse = await fetch('https://pump.fun/api/ipfs', {
       method: 'POST',
       body: formData,
     })
 
     if (!ipfsResponse.ok) {
-      throw new Error(`IPFS upload failed: ${ipfsResponse.statusText}`)
+      const errorText = await ipfsResponse.text()
+      console.error('[deployToken] IPFS upload failed:', errorText)
+      throw new Error(`IPFS upload failed: ${ipfsResponse.statusText} - ${errorText}`)
     }
 
     const ipfsData = await ipfsResponse.json()
-    const metadataUri = ipfsData.metadataUri
+    const metadataUri = ipfsData.metadataUri || ipfsData.uri
 
     if (!metadataUri) {
+      console.error('[deployToken] No metadata URI in response:', ipfsData)
       throw new Error('No metadata URI returned from IPFS')
     }
 
-    // Step 2: Deploy via PumpPortal Lightning API
-    const tradePayload = {
+    console.log('[deployToken] Metadata URI:', metadataUri)
+
+    // Step 2: Deploy via PumpPortal API
+    const mintPublicKey = mintKeypair.publicKey.toBase58()
+    
+    const deployPayload = {
       action: 'create',
       tokenMetadata: {
-        name,
-        symbol,
+        name: name,
+        symbol: symbol,
         uri: metadataUri,
       },
-      mint: bs58.encode(mintKeypair.secretKey),
+      mint: mintPublicKey,
       denominatedInSol: 'true',
-      amount: String(devBuySol), // PumpPortal requires string
+      amount: devBuySol.toString(),
       slippage: 10,
       priorityFee: 0.0005,
       pool: 'pump',
     }
 
-    const deployResponse = await fetch(
-      'https://pumpportal.fun/api/trade',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.PUMPPORTAL_API_KEY}`,
-        },
-        body: JSON.stringify(tradePayload),
-      }
-    )
+    console.log('[deployToken] Deploying with payload:', JSON.stringify(deployPayload, null, 2))
+    
+    const deployResponse = await fetch('https://pumpportal.fun/api/trade', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.PUMPPORTAL_API_KEY || ''
+      },
+      body: JSON.stringify(deployPayload),
+    })
 
     if (!deployResponse.ok) {
       const errText = await deployResponse.text()
-      throw new Error(`PumpPortal deploy failed: ${errText}`)
+      console.error('[deployToken] PumpPortal deploy failed:', errText)
+      throw new Error(`PumpPortal deploy failed: ${deployResponse.status} - ${errText}`)
     }
 
     const deployData = await deployResponse.json()
+    console.log('[deployToken] Deploy response:', deployData)
+
+    const txSignature = deployData.signature || deployData.txid || deployData.transactionId
+    
+    if (!txSignature) {
+      console.warn('[deployToken] No transaction signature in response')
+    }
+
     const mintAddress = mintKeypair.publicKey.toBase58()
+    const pumpFunUrl = `https://pump.fun/coin/${mintAddress}`
+
+    console.log('[deployToken] Success! Token at:', pumpFunUrl)
 
     return {
       success: true,
       mintAddress,
-      txSignature: deployData.signature,
-      pumpFunUrl: `https://pump.fun/coin/${mintAddress}`,
+      txSignature,
+      pumpFunUrl,
     }
   } catch (error: any) {
     console.error('[deployToken] Error:', error)
     return {
       success: false,
-      mintAddress: mintKeypair.publicKey.toBase58(),
+      mintAddress: params.mintKeypair.publicKey.toBase58(),
       error: error.message || 'Unknown error',
     }
   }
@@ -157,11 +186,11 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 // ============================================================
 
 export interface ClaimFeesParams {
-  tokenWalletPrivKey: string   // bs58 encoded private key of token fee wallet
-  destinationWallet: string    // user's Solana wallet to receive 90%
-  platformWallet: string       // platform wallet to receive 10%
+  tokenWalletPrivKey: string
+  destinationWallet: string
+  platformWallet: string
   amountLamports: bigint
-  platformFeePct?: number      // default 10
+  platformFeePct?: number
 }
 
 export interface ClaimFeesResult {
@@ -186,7 +215,6 @@ export async function claimFees(params: ClaimFeesParams): Promise<ClaimFeesResul
     const platformFeeLamports = BigInt(Math.floor(Number(amountLamports) * platformFeePct / 100))
     const netAmountLamports = amountLamports - platformFeeLamports
 
-    // Reserve some SOL for transaction fees (~5000 lamports)
     const txFeeReserve = BigInt(5000)
     const actualNet = netAmountLamports - txFeeReserve
 
@@ -196,14 +224,12 @@ export async function claimFees(params: ClaimFeesParams): Promise<ClaimFeesResul
 
     const tx = new Transaction()
 
-    // Send 90% to user
     tx.add(SystemProgram.transfer({
       fromPubkey: tokenWalletKeypair.publicKey,
       toPubkey: new PublicKey(destinationWallet),
       lamports: actualNet,
     }))
 
-    // Send 10% to platform
     tx.add(SystemProgram.transfer({
       fromPubkey: tokenWalletKeypair.publicKey,
       toPubkey: new PublicKey(platformWallet),
