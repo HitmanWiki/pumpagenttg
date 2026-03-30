@@ -4,7 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import './globals.css'
 
-const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
+const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
+
+// Add TypeScript declaration for window.onTelegramAuth
+declare global {
+  interface Window {
+    onTelegramAuth?: (user: any) => void
+  }
+}
 
 // ── Animated counter ──────────────────────────────────────────────────────────
 function Counter({ end, suffix = '', duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
@@ -112,6 +119,7 @@ const TgIcon = () => (
 function TelegramLogin() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Check if already logged in
@@ -129,8 +137,8 @@ function TelegramLogin() {
     script.async = true
     script.setAttribute('data-telegram-login', BOT_USERNAME)
     script.setAttribute('data-size', 'large')
-    script.setAttribute('data-auth-url', `${window.location.origin}/api/auth/telegram`)
     script.setAttribute('data-request-access', 'write')
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
     
     const container = document.getElementById('telegram-login-widget')
     if (container) {
@@ -142,13 +150,18 @@ function TelegramLogin() {
       if (container && script.parentNode) {
         script.parentNode.removeChild(script)
       }
+      // Clean up the global callback
+      window.onTelegramAuth = undefined
     }
   }, [router])
 
   // Global callback for Telegram login
-  if (typeof window !== 'undefined') {
+  useEffect(() => {
     window.onTelegramAuth = async (user: any) => {
+      console.log('[Telegram] Auth callback received:', user)
       setLoading(true)
+      setError(null)
+      
       try {
         const response = await fetch('/api/auth/telegram', {
           method: 'POST',
@@ -156,23 +169,35 @@ function TelegramLogin() {
           body: JSON.stringify(user)
         })
         
-        if (response.ok) {
-          router.push('/dashboard')
+        const data = await response.json()
+        console.log('[Telegram] Auth response:', data)
+        
+        if (response.ok && data.success) {
+          // Wait a moment for cookie to be set
+          setTimeout(() => {
+            router.push('/dashboard')
+          }, 500)
         } else {
-          console.error('Login failed')
+          setError(data.error || 'Login failed')
           setLoading(false)
         }
       } catch (error) {
-        console.error('Login error:', error)
+        console.error('[Telegram] Login error:', error)
+        setError('Network error. Please try again.')
         setLoading(false)
       }
     }
-  }
+
+    return () => {
+      window.onTelegramAuth = undefined
+    }
+  }, [router])
 
   return (
     <div className="telegram-login-container">
       <div id="telegram-login-widget" className="flex justify-center"></div>
       {loading && <p className="mt-4 text-center text-gray-400">Logging in...</p>}
+      {error && <p className="mt-4 text-center text-red-500">{error}</p>}
     </div>
   )
 }
@@ -403,11 +428,4 @@ export default function HomePage() {
       </div>
     </>
   )
-}
-
-// Add TypeScript declaration for window.onTelegramAuth
-declare global {
-  interface Window {
-    onTelegramAuth: (user: any) => void
-  }
 }

@@ -1,31 +1,16 @@
 // src/app/api/auth/me/route.ts
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { verifySession } from '@/lib/auth'
+import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const allCookies = cookieStore.getAll()
-    console.log('[Auth/me] All cookies:', allCookies.map(c => c.name))
+    const session = await getSession()
     
-    const token = cookieStore.get('pump_agent_session')?.value
-    
-    if (!token) {
-      console.log('[Auth/me] No session token found')
-      return NextResponse.json({ user: null }, { status: 401 })
-    }
-    
-    console.log('[Auth/me] Session token found, verifying...')
-    
-    const session = await verifySession(token)
     if (!session) {
-      console.log('[Auth/me] Invalid session token')
+      console.log('[Auth/me] No session found')
       return NextResponse.json({ user: null }, { status: 401 })
     }
-    
-    console.log('[Auth/me] Session verified for user:', session.id)
     
     const user = await prisma.user.findUnique({
       where: { id: session.id },
@@ -36,8 +21,6 @@ export async function GET() {
         telegramFirstName: true,
         telegramLastName: true,
         telegramPhotoUrl: true,
-        createdAt: true,
-        updatedAt: true,
       }
     })
     
@@ -46,20 +29,18 @@ export async function GET() {
       return NextResponse.json({ user: null }, { status: 401 })
     }
     
-    // Convert BigInt to string for JSON serialization
-    const serializedUser = {
-      ...user,
-      telegramId: user.telegramId.toString(),
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-    }
-    
-    return NextResponse.json({ user: serializedUser })
+    return NextResponse.json({ 
+      user: {
+        id: user.id,
+        telegramId: user.telegramId.toString(),
+        telegramUsername: user.telegramUsername,
+        telegramFirstName: user.telegramFirstName,
+        telegramLastName: user.telegramLastName,
+        telegramPhotoUrl: user.telegramPhotoUrl,
+      }
+    })
   } catch (error) {
     console.error('[Auth/me] Error:', error)
-    return NextResponse.json(
-      { user: null, error: 'Server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ user: null }, { status: 500 })
   }
 }
