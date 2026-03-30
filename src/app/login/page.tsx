@@ -1,10 +1,7 @@
-// src/app/login/page.tsx
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -12,26 +9,32 @@ export default function LoginPage() {
     // Check if already logged in
     const token = localStorage.getItem('auth_token')
     if (token) {
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
       return
     }
 
-    // Load Telegram Login Widget
-    const script = document.createElement('script')
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot')
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    
+    // Get bot username from env
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
+    console.log('[Login] Using bot username:', botUsername)
+
+    // Create and load the Telegram widget
     const container = document.getElementById('telegram-login-widget')
     if (container) {
       container.innerHTML = ''
+      
+      // Create the script
+      const script = document.createElement('script')
+      script.src = 'https://telegram.org/js/telegram-widget.js?22'
+      script.async = true
+      script.setAttribute('data-telegram-login', botUsername)
+      script.setAttribute('data-size', 'large')
+      script.setAttribute('data-request-access', 'write')
+      script.setAttribute('data-onauth', 'onTelegramAuth(user)')
+      
       container.appendChild(script)
     }
 
-    // Define the callback function globally
+    // Define the callback
     window.onTelegramAuth = async (user: any) => {
       console.log('[Login] Telegram user:', user)
       setLoading(true)
@@ -66,12 +69,9 @@ export default function LoginPage() {
     }
 
     return () => {
-      if (container && script.parentNode) {
-        script.parentNode.removeChild(script)
-      }
       window.onTelegramAuth = undefined
     }
-  }, [router])
+  }, [])
 
   return (
     <div style={{ 

@@ -284,7 +284,7 @@ export default function DashboardPage() {
                 <div className="empty-icon">🚀</div>
                 <div className="empty-title">No tokens yet</div>
                 <div className="empty-sub">Launch your first token via Telegram to get started</div>
-                <a href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'}`} target="_blank" rel="noopener noreferrer" className="btn-primary">Open Telegram Bot</a>
+                <a href={`https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'}`} target="_blank" rel="noopener noreferrer" className="btn-primary">Open Telegram Bot</a>
               </div>
             ) : (
               <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'1rem'}}>
