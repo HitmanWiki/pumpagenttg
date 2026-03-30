@@ -5,7 +5,6 @@ import prisma from '@/lib/prisma'
 
 export async function GET(request: Request) {
   try {
-    // Get token from Authorization header
     const authHeader = request.headers.get('Authorization')
     const token = authHeader?.split(' ')[1]
     

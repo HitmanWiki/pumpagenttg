@@ -59,40 +59,43 @@ export default function DashboardPage() {
     }
   }
 
-  async function fetchAll() {
-    const token = getAuthToken()
-    if (!token) return
+  // src/app/dashboard/page.tsx - Update the fetchAll function
+async function fetchAll() {
+  const token = getAuthToken()
+  if (!token) return
+  
+  setLoading(true)
+  try {
+    const [meRes, tokRes] = await Promise.all([
+      fetch('/api/auth/me', { 
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/tokens', { 
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+    ])
     
-    setLoading(true)
-    try {
-      const [meRes, tokRes] = await Promise.all([
-        fetch('/api/auth/me', { 
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/tokens', { 
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ])
-      
-      if (meRes.ok) {
-        const meData = await meRes.json()
-        setUser(meData.user)
-      } else {
-        console.log('[Dashboard] Auth/me failed:', meRes.status)
-      }
-      
-      if (tokRes.ok) {
-        const tokData = await tokRes.json()
-        setData(tokData)
-      } else {
-        console.log('[Dashboard] Tokens failed:', tokRes.status)
-      }
-    } catch (error) {
-      console.error('Fetch error:', error)
-    } finally {
-      setLoading(false)
+    console.log('[Dashboard] Auth/me status:', meRes.status)
+    console.log('[Dashboard] Tokens status:', tokRes.status)
+    
+    if (meRes.ok) {
+      const meData = await meRes.json()
+      setUser(meData.user)
+    } else {
+      const errorText = await meRes.text()
+      console.log('[Dashboard] Auth/me error:', errorText)
     }
+    
+    if (tokRes.ok) {
+      const tokData = await tokRes.json()
+      setData(tokData)
+    }
+  } catch (error) {
+    console.error('Fetch error:', error)
+  } finally {
+    setLoading(false)
   }
+}
 
   async function handleClaim() {
     const token = getAuthToken()

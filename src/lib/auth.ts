@@ -29,7 +29,7 @@ export async function signSession(user: SessionUser): Promise<string> {
   return token
 }
 
-// Verify a JWT session token
+// Verify a JWT session token - ✅ This is what your tokens route uses
 export async function verifySession(token: string): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
