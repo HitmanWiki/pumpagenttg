@@ -8,14 +8,20 @@ const COOKIE_NAME = 'pump_agent_session'
 
 export interface SessionUser {
   id: string
-  telegramId: number
+  telegramId: bigint  // Change from number to bigint
   telegramUsername: string | null
   telegramFirstName: string | null
 }
 
 // Sign a JWT session token
 export async function signSession(user: SessionUser): Promise<string> {
-  return new SignJWT({ ...user })
+  // Convert bigint to string for JWT serialization
+  const serializedUser = {
+    ...user,
+    telegramId: user.telegramId.toString(), // Convert bigint to string
+  }
+  
+  return new SignJWT({ ...serializedUser })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('30d')
     .setIssuedAt()
@@ -26,7 +32,13 @@ export async function signSession(user: SessionUser): Promise<string> {
 export async function verifySession(token: string): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
-    return payload as unknown as SessionUser
+    // Convert telegramId back to bigint
+    return {
+      id: payload.id as string,
+      telegramId: BigInt(payload.telegramId as string),
+      telegramUsername: payload.telegramUsername as string | null,
+      telegramFirstName: payload.telegramFirstName as string | null,
+    }
   } catch {
     return null
   }
