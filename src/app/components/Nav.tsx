@@ -1,14 +1,29 @@
+// src/components/Nav.tsx
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 export default function Nav() {
-  const path = usePathname()
-  const links = [
-    { href: '/leaderboard', label: 'Leaderboard' },
-    { href: '/tokens',      label: 'Tokens' },
-    { href: '/dashboard',   label: 'Dashboard' },
-  ]
+  const router = useRouter()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    // Check if user is logged in via cookie
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(res => setIsLoggedIn(res.ok))
+      .catch(() => setIsLoggedIn(false))
+  }, [])
+
+  const handleLogout = async () => {
+    // Call logout endpoint (you may need to create this)
+    await fetch('/api/auth/logout', { 
+      method: 'POST',
+      credentials: 'include' 
+    })
+    router.push('/')
+  }
+
   return (
     <nav className="nav">
       <Link href="/" className="nav-logo">
@@ -16,21 +31,18 @@ export default function Nav() {
         <span className="logo-text">Pump Agent</span>
       </Link>
       <div className="nav-links">
-        {links.map(l => (
-          <Link key={l.href} href={l.href} className={`nav-link${path === l.href ? ' active' : ''}`}>
-            {l.label}
+        <Link href="/leaderboard" className="nav-link">Leaderboard</Link>
+        <Link href="/tokens" className="nav-link">Tokens</Link>
+        <Link href="/dashboard" className="nav-link">Dashboard</Link>
+        {isLoggedIn ? (
+          <button onClick={handleLogout} className="btn-ghost" style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem' }}>
+            Logout
+          </button>
+        ) : (
+          <Link href="/" className="btn-primary" style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', borderRadius: 8 }}>
+            Login
           </Link>
-        ))}
-        <a
-          href={`https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'YourBot'}`}
-          target="_blank" rel="noopener noreferrer"
-          className="btn-primary btn-sm"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.26 14.48l-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.194 1.006.131.893.077z"/>
-          </svg>
-          Launch Token
-        </a>
+        )}
       </div>
     </nav>
   )

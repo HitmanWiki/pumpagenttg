@@ -20,23 +20,14 @@ export default function DashboardPage() {
   const [msg, setMsg]         = useState('')
   const [copied, setCopied]   = useState('')
 
-  // Get auth token from localStorage
-  const getAuthToken = () => localStorage.getItem('auth_token')
-
   useEffect(() => { 
     checkAuth() 
   }, [])
 
   async function checkAuth() {
-    const token = getAuthToken()
-    if (!token) {
-      router.push('/')
-      return
-    }
-
     try {
       const res = await fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include' // Important: Send cookies!
       })
       
       if (res.ok) {
@@ -44,9 +35,7 @@ export default function DashboardPage() {
         setUser(data.user)
         await fetchAll()
       } else {
-        // Token invalid, clear storage and redirect
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('auth_user')
+        // Not authenticated, redirect to home
         router.push('/')
       }
     } catch (error) {
@@ -58,18 +47,11 @@ export default function DashboardPage() {
   }
 
   async function fetchAll() {
-    const token = getAuthToken()
-    if (!token) return
-    
     setLoading(true)
     try {
       const [meRes, tokRes] = await Promise.all([
-        fetch('/api/auth/me', { 
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/tokens', { 
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+        fetch('/api/auth/me', { credentials: 'include' }),
+        fetch('/api/tokens', { credentials: 'include' })
       ])
       
       if (meRes.ok) {
@@ -89,23 +71,14 @@ export default function DashboardPage() {
   }
 
   async function handleClaim() {
-    const token = getAuthToken()
-    if (!token) {
-      setMsg('Please login again')
-      router.push('/')
-      return
-    }
-    
     if (!destWallet) return setMsg('Enter your Solana wallet address')
     setClaiming(true); setMsg('')
     
     try {
       const res = await fetch('/api/fees/claim', {
         method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Send cookies
         body: JSON.stringify({ destinationWallet: destWallet }),
       })
       const json = await res.json()
