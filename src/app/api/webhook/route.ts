@@ -1,32 +1,29 @@
+// src/app/api/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import bot from '@/lib/bot'
-import { webhookCallback } from 'grammy'
-
-const handleUpdate = webhookCallback(bot, 'std/http')
 
 export async function POST(req: NextRequest) {
   try {
-    // Clone the request so we can read it in background too
-    const body = await req.json()
-
-    // Respond to Telegram immediately (must be within 10s)
-    // Process the update in the background
-    const bgReq = new Request(req.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    // Get the update from Telegram
+    const update = await req.json()
+    
+    // Log the incoming update for debugging
+    console.log('[Webhook] Received update:', {
+      update_id: update.update_id,
+      has_message: !!update.message,
+      message_text: update.message?.text,
+      username: update.message?.from?.username
     })
-
-    // Fire and forget — don't await
-    handleUpdate(bgReq).catch(err => {
-      console.error('[Webhook] Background processing error:', err)
-    })
-
-    // Immediately return 200 OK to Telegram
+    
+    // Process the update with your bot
+    await bot.handleUpdate(update)
+    
+    // Always return 200 OK to Telegram
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[Webhook] Error:', error)
-    return NextResponse.json({ ok: true }) // always 200
+    // Still return 200 to Telegram - we don't want to retry failed updates
+    return NextResponse.json({ ok: true })
   }
 }
 
@@ -34,6 +31,7 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     bot: process.env.TELEGRAM_BOT_USERNAME,
+    webhook_set: true,
     timestamp: new Date().toISOString(),
   })
 }

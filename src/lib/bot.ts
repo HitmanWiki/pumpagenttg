@@ -4,36 +4,76 @@ import { Keypair } from '@solana/web3.js'
 import { deployToken, generateTokenWallet } from './solana'
 import prisma from './prisma'
 
-const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN!)
+// Check if bot token exists
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  console.error('❌ TELEGRAM_BOT_TOKEN is not set')
+  throw new Error('TELEGRAM_BOT_TOKEN is required')
+}
+
+const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN)
+
+// ============================================================
+// Middleware & Error Handling
+// ============================================================
+
+// Log all updates for debugging
+bot.use(async (ctx, next) => {
+  console.log('[Bot] Update received:', {
+    type: ctx.update.message ? 'message' : 
+          ctx.update.callback_query ? 'callback' : 
+          ctx.update.edited_message ? 'edited_message' : 'other',
+    message_text: ctx.message?.text,
+    username: ctx.from?.username,
+    chat_id: ctx.chat?.id,
+    update_id: ctx.update.update_id
+  })
+  await next()
+})
+
+// Global error handler
+bot.catch((err) => {
+  console.error('[Bot] Error caught:', err)
+})
 
 // ============================================================
 // /start command
 // ============================================================
 bot.command('start', async (ctx) => {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  await ctx.reply(
-    `👋 *Welcome to Pump Agent!*\n\n` +
-    `Launch meme tokens on pump.fun directly from Telegram — no code needed.\n\n` +
-    `*How to launch a token:*\n` +
-    `1️⃣ Send a photo (your token image)\n` +
-    `2️⃣ Add the caption:\n\n` +
-    `\`/launch Token Name $TICKER\`\n` +
-    `\`description: Your token description\`\n` +
-    `\`website: https://yoursite.com\`\n\n` +
-    `*Commands:*\n` +
-    `/launch — Deploy a new token\n` +
-    `/tokens — View your tokens\n` +
-    `/fees — Check claimable fees\n` +
-    `/help — Show this message\n\n` +
-    `📊 [View Dashboard](${appUrl}/dashboard)`,
-    { 
-      parse_mode: 'Markdown',
-      link_preview_options: { is_disabled: true }
-    }
-  )
+  console.log('[Bot] /start command from:', ctx.from?.username)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
+  
+  try {
+    await ctx.reply(
+      `👋 *Welcome to Pump Agent!*\n\n` +
+      `Launch meme tokens on pump.fun directly from Telegram — no code needed.\n\n` +
+      `*How to launch a token:*\n` +
+      `1️⃣ Send a photo (your token image)\n` +
+      `2️⃣ Add the caption:\n\n` +
+      `\`/launch Token Name $TICKER\`\n` +
+      `\`description: Your token description\`\n` +
+      `\`website: https://yoursite.com\`\n\n` +
+      `*Commands:*\n` +
+      `/launch — Deploy a new token\n` +
+      `/tokens — View your tokens\n` +
+      `/fees — Check claimable fees\n` +
+      `/help — Show this message\n\n` +
+      `📊 [View Dashboard](${appUrl}/dashboard)`,
+      { 
+        parse_mode: 'Markdown',
+        link_preview_options: { is_disabled: true }
+      }
+    )
+    console.log('[Bot] /start reply sent successfully')
+  } catch (error) {
+    console.error('[Bot] Failed to send /start reply:', error)
+  }
 })
 
+// ============================================================
+// /help command
+// ============================================================
 bot.command('help', async (ctx) => {
+  console.log('[Bot] /help command from:', ctx.from?.username)
   await ctx.reply(
     `*Pump Agent — Help*\n\n` +
     `*Launch a token:*\n` +
@@ -54,106 +94,134 @@ bot.command('help', async (ctx) => {
 })
 
 // ============================================================
+// /ping command (for testing)
+// ============================================================
+bot.command('ping', async (ctx) => {
+  console.log('[Bot] /ping from:', ctx.from?.username)
+  await ctx.reply('pong! 🏓')
+})
+
+// ============================================================
 // /tokens command
 // ============================================================
 bot.command('tokens', async (ctx) => {
+  console.log('[Bot] /tokens command from:', ctx.from?.username)
   const telegramId = ctx.from?.id
   if (!telegramId) return ctx.reply('Could not identify your Telegram account.')
 
-  const user = await prisma.user.findUnique({
-    where: { telegramId: BigInt(telegramId) },
-    include: {
-      tokens: {
-        where: { status: { not: 'FAILED' } },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: BigInt(telegramId) },
+      include: {
+        tokens: {
+          where: { status: { not: 'FAILED' } },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        }
       }
+    })
+
+    if (!user || user.tokens.length === 0) {
+      return ctx.reply(
+        `You haven't launched any tokens yet.\n\nSend a photo with /launch to get started!`
+      )
     }
-  })
 
-  if (!user || user.tokens.length === 0) {
-    return ctx.reply(
-      `You haven't launched any tokens yet.\n\nSend a photo with /launch to get started!`
-    )
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
+    let msg = `*Your Tokens (${user.tokens.length})*\n\n`
+
+    for (const token of user.tokens) {
+      const feeSol = (Number(token.claimableFeesLamports) / 1e9).toFixed(4)
+      msg += `• *${token.name}* (\$${token.symbol})\n`
+      msg += `  💰 Claimable: ${feeSol} SOL\n`
+      msg += `  🔗 [pump.fun](${token.pumpFunUrl})\n\n`
+    }
+
+    msg += `[View full dashboard →](${appUrl}/dashboard)`
+
+    await ctx.reply(msg, { 
+      parse_mode: 'Markdown',
+      link_preview_options: { is_disabled: true }
+    })
+  } catch (error) {
+    console.error('[Bot] /tokens error:', error)
+    await ctx.reply('❌ Failed to fetch your tokens. Please try again later.')
   }
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  let msg = `*Your Tokens (${user.tokens.length})*\n\n`
-
-  for (const token of user.tokens) {
-    const feeSol = (Number(token.claimableFeesLamports) / 1e9).toFixed(4)
-    msg += `• *${token.name}* (\$${token.symbol})\n`
-    msg += `  💰 Claimable: ${feeSol} SOL\n`
-    msg += `  🔗 [pump.fun](${token.pumpFunUrl})\n\n`
-  }
-
-  msg += `[View full dashboard →](${appUrl}/dashboard)`
-
-  await ctx.reply(msg, { 
-    parse_mode: 'Markdown',
-    link_preview_options: { is_disabled: true }
-  })
 })
 
 // ============================================================
 // /fees command
 // ============================================================
 bot.command('fees', async (ctx) => {
+  console.log('[Bot] /fees command from:', ctx.from?.username)
   const telegramId = ctx.from?.id
   if (!telegramId) return ctx.reply('Could not identify your Telegram account.')
 
-  const user = await prisma.user.findUnique({
-    where: { telegramId: BigInt(telegramId) },
-    include: { tokens: { where: { status: 'LIVE' } } }
-  })
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: BigInt(telegramId) },
+      include: { tokens: { where: { status: 'LIVE' } } }
+    })
 
-  if (!user || user.tokens.length === 0) {
-    return ctx.reply(`No active tokens found. Launch one with /launch!`)
-  }
-
-  const totalClaimable = user.tokens.reduce(
-    (sum, t) => sum + Number(t.claimableFeesLamports), 0
-  )
-  const totalEarned = user.tokens.reduce(
-    (sum, t) => sum + Number(t.totalFeesEarnedLamports), 0
-  )
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  const claimableSol = (totalClaimable / 1e9).toFixed(4)
-  const earnedSol = (totalEarned / 1e9).toFixed(4)
-
-  await ctx.reply(
-    `*Your Fee Summary*\n\n` +
-    `📈 Total earned: *${earnedSol} SOL*\n` +
-    `💰 Available to claim: *${claimableSol} SOL*\n` +
-    `📊 Active tokens: ${user.tokens.length}\n\n` +
-    `[Claim fees on dashboard →](${appUrl}/claim)`,
-    { 
-      parse_mode: 'Markdown',
-      link_preview_options: { is_disabled: true }
+    if (!user || user.tokens.length === 0) {
+      return ctx.reply(`No active tokens found. Launch one with /launch!`)
     }
-  )
+
+    const totalClaimable = user.tokens.reduce(
+      (sum, t) => sum + Number(t.claimableFeesLamports), 0
+    )
+    const totalEarned = user.tokens.reduce(
+      (sum, t) => sum + Number(t.totalFeesEarnedLamports), 0
+    )
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
+    const claimableSol = (totalClaimable / 1e9).toFixed(4)
+    const earnedSol = (totalEarned / 1e9).toFixed(4)
+
+    await ctx.reply(
+      `*Your Fee Summary*\n\n` +
+      `📈 Total earned: *${earnedSol} SOL*\n` +
+      `💰 Available to claim: *${claimableSol} SOL*\n` +
+      `📊 Active tokens: ${user.tokens.length}\n\n` +
+      `[Claim fees on dashboard →](${appUrl}/claim)`,
+      { 
+        parse_mode: 'Markdown',
+        link_preview_options: { is_disabled: true }
+      }
+    )
+  } catch (error) {
+    console.error('[Bot] /fees error:', error)
+    await ctx.reply('❌ Failed to fetch fees. Please try again later.')
+  }
 })
 
 // ============================================================
 // Photo + /launch caption handler
 // ============================================================
 bot.on('message:photo', async (ctx) => {
+  console.log('[Bot] Photo received from:', ctx.from?.username)
   const caption = ctx.message.caption || ''
 
   if (!caption.toLowerCase().startsWith('/launch')) {
+    console.log('[Bot] Photo without /launch, ignoring')
     return // ignore photos without /launch
   }
 
+  console.log('[Bot] Launching token from photo with caption:', caption)
   await handleLaunch(ctx, caption)
 })
 
-// Also handle /launch sent as a command (will prompt for image)
+// ============================================================
+// /launch command (without photo)
+// ============================================================
 bot.command('launch', async (ctx) => {
+  console.log('[Bot] /launch command from:', ctx.from?.username)
+  
   // If this is a reply to a photo message, use that photo
   const replyPhoto = ctx.message?.reply_to_message?.photo
   if (replyPhoto) {
     const caption = ctx.message?.text || ''
+    console.log('[Bot] Launching from replied photo')
     await handleLaunch(ctx, caption, replyPhoto)
     return
   }
@@ -174,6 +242,8 @@ bot.command('launch', async (ctx) => {
 async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) {
   const telegramUser = ctx.from
   if (!telegramUser) return ctx.reply('Could not identify your account.')
+
+  console.log('[Launch] Starting launch process for user:', telegramUser.username)
 
   // Parse the caption
   const lines = caption.split('\n').map(l => l.trim())
@@ -213,6 +283,8 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     }
   }
 
+  console.log('[Launch] Token details:', { tokenName, tokenSymbol, description, website })
+
   // Get photo
   const photos = photoOverride || ctx.message?.photo
   if (!photos || photos.length === 0) {
@@ -234,6 +306,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     const file = await ctx.api.getFile(photo.file_id)
     const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
 
+    console.log('[Launch] Downloading image from:', fileUrl)
     const imageRes = await fetch(fileUrl)
     const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
 
@@ -258,6 +331,8 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     // Generate a separate wallet for fee accumulation
     const feeWallet = generateTokenWallet()
 
+    console.log('[Launch] Mint address:', mintKeypair.publicKey.toBase58())
+
     // Update status message
     await ctx.api.editMessageText(
       ctx.chat!.id,
@@ -267,6 +342,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     )
 
     // Deploy the token
+    console.log('[Launch] Calling deployToken...')
     const deployResult = await deployToken({
       name: tokenName,
       symbol: tokenSymbol,
@@ -280,6 +356,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     })
 
     if (!deployResult.success) {
+      console.error('[Launch] Deployment failed:', deployResult.error)
       await ctx.api.editMessageText(
         ctx.chat!.id,
         statusMsg.message_id,
@@ -288,6 +365,8 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       )
       return
     }
+
+    console.log('[Launch] Deployment successful! Pump.fun URL:', deployResult.pumpFunUrl)
 
     // Save token to DB
     await prisma.token.create({
@@ -308,8 +387,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       }
     })
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    const shortMint = `${deployResult.mintAddress.slice(0, 6)}...${deployResult.mintAddress.slice(-6)}`
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
 
     // Success message
     await ctx.api.editMessageText(
@@ -325,6 +403,8 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
         link_preview_options: { is_disabled: true }
       }
     )
+    
+    console.log('[Launch] Success message sent')
 
   } catch (error: any) {
     console.error('[handleLaunch] Error:', error)
