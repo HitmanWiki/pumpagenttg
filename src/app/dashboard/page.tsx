@@ -20,14 +20,24 @@ export default function DashboardPage() {
   const [msg, setMsg]         = useState('')
   const [copied, setCopied]   = useState('')
 
+  // Get auth token from localStorage
+  const getAuthToken = () => localStorage.getItem('auth_token')
+
   useEffect(() => { 
     checkAuth() 
   }, [])
 
   async function checkAuth() {
+    const token = getAuthToken()
+    if (!token) {
+      console.log('[Dashboard] No token found, redirecting to login')
+      router.push('/')
+      return
+    }
+
     try {
       const res = await fetch('/api/auth/me', {
-        credentials: 'include' // Important: Send cookies!
+        headers: { 'Authorization': `Bearer ${token}` }
       })
       
       if (res.ok) {
@@ -35,7 +45,10 @@ export default function DashboardPage() {
         setUser(data.user)
         await fetchAll()
       } else {
-        // Not authenticated, redirect to home
+        // Token invalid, clear storage and redirect
+        console.log('[Dashboard] Token invalid, clearing storage')
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
         router.push('/')
       }
     } catch (error) {
@@ -45,32 +58,34 @@ export default function DashboardPage() {
       setLoading(false)
     }
   }
-// src/app/dashboard/page.tsx - Add a debug check
-useEffect(() => {
-  // Test cookie endpoint first
-  fetch('/api/auth/test-cookie')
-    .then(res => res.json())
-    .then(data => console.log('[Dashboard] Cookie test:', data))
-    .catch(console.error)
-  
-  checkAuth()
-}, [])
+
   async function fetchAll() {
+    const token = getAuthToken()
+    if (!token) return
+    
     setLoading(true)
     try {
       const [meRes, tokRes] = await Promise.all([
-        fetch('/api/auth/me', { credentials: 'include' }),
-        fetch('/api/tokens', { credentials: 'include' })
+        fetch('/api/auth/me', { 
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/tokens', { 
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       ])
       
       if (meRes.ok) {
         const meData = await meRes.json()
         setUser(meData.user)
+      } else {
+        console.log('[Dashboard] Auth/me failed:', meRes.status)
       }
       
       if (tokRes.ok) {
         const tokData = await tokRes.json()
         setData(tokData)
+      } else {
+        console.log('[Dashboard] Tokens failed:', tokRes.status)
       }
     } catch (error) {
       console.error('Fetch error:', error)
@@ -80,14 +95,23 @@ useEffect(() => {
   }
 
   async function handleClaim() {
+    const token = getAuthToken()
+    if (!token) {
+      setMsg('Please login again')
+      setTimeout(() => router.push('/'), 1500)
+      return
+    }
+    
     if (!destWallet) return setMsg('Enter your Solana wallet address')
     setClaiming(true); setMsg('')
     
     try {
       const res = await fetch('/api/fees/claim', {
         method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Send cookies
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ destinationWallet: destWallet }),
       })
       const json = await res.json()
@@ -119,7 +143,7 @@ useEffect(() => {
         <div className="empty-icon">🔒</div>
         <div className="empty-title">Sign in required</div>
         <div className="empty-sub">Connect with Telegram to view your dashboard</div>
-        <Link href="/" className="btn-primary">← Go Home</Link>
+        <Link href="/login" className="btn-primary">← Go to Login</Link>
       </div>
     <Footer/></div></>
   )

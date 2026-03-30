@@ -1,14 +1,22 @@
 // src/app/api/auth/me/route.ts
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { verifySession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const session = await getSession()
+    // Get token from Authorization header
+    const authHeader = request.headers.get('Authorization')
+    const token = authHeader?.split(' ')[1]
     
+    if (!token) {
+      console.log('[Auth/me] No token provided')
+      return NextResponse.json({ user: null }, { status: 401 })
+    }
+    
+    const session = await verifySession(token)
     if (!session) {
-      console.log('[Auth/me] No session found')
+      console.log('[Auth/me] Invalid token')
       return NextResponse.json({ user: null }, { status: 401 })
     }
     
@@ -25,7 +33,6 @@ export async function GET() {
     })
     
     if (!user) {
-      console.log('[Auth/me] User not found:', session.id)
       return NextResponse.json({ user: null }, { status: 401 })
     }
     

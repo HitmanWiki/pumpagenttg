@@ -9,13 +9,19 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if already logged in
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(res => {
+    const savedToken = localStorage.getItem('auth_token')
+    if (savedToken) {
+      fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${savedToken}` }
+      }).then(res => {
         if (res.ok) {
           router.push('/dashboard')
+        } else {
+          localStorage.removeItem('auth_token')
+          localStorage.removeItem('auth_user')
         }
-      })
-      .catch(console.error)
+      }).catch(console.error)
+    }
 
     // Load Telegram Login Widget
     const script = document.createElement('script')
@@ -39,7 +45,6 @@ export default function LoginPage() {
     }
   }, [router])
 
-  // Global callback
   useEffect(() => {
     window.onTelegramAuth = async (user: any) => {
       console.log('[Login] Telegram user:', user)
@@ -49,18 +54,19 @@ export default function LoginPage() {
         const response = await fetch('/api/auth/telegram', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify(user)
         })
         
         const data = await response.json()
         console.log('[Login] Auth response:', data)
         
-        if (response.ok && data.success) {
-          // Force a small delay to ensure cookie is set
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 1000)
+        if (response.ok && data.success && data.token) {
+          // Store token in localStorage
+          localStorage.setItem('auth_token', data.token)
+          localStorage.setItem('auth_user', JSON.stringify(data.user))
+          
+          // Redirect to dashboard
+          router.push('/dashboard')
         } else {
           alert(data.error || 'Login failed')
           setLoading(false)

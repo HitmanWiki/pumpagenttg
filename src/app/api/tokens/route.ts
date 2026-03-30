@@ -1,6 +1,5 @@
 // src/app/api/tokens/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { verifySession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { connection } from '@/lib/solana'
@@ -8,11 +7,12 @@ import { PublicKey } from '@solana/web3.js'
 
 export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('pump_agent_session')?.value
+    // Get token from Authorization header
+    const authHeader = req.headers.get('Authorization')
+    const token = authHeader?.split(' ')[1]
     
     if (!token) {
-      console.log('[Tokens] No session token')
+      console.log('[Tokens] No token provided')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
             new PublicKey(token.tokenWalletAddress)
           )
           
-          // Update in background
+          // Update in background (don't await)
           prisma.token.update({
             where: { id: token.id },
             data: {

@@ -9,18 +9,13 @@ export default function Nav() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
-    // Check if user is logged in via cookie
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(res => setIsLoggedIn(res.ok))
-      .catch(() => setIsLoggedIn(false))
+    const token = localStorage.getItem('auth_token')
+    setIsLoggedIn(!!token)
   }, [])
 
-  const handleLogout = async () => {
-    // Call logout endpoint (you may need to create this)
-    await fetch('/api/auth/logout', { 
-      method: 'POST',
-      credentials: 'include' 
-    })
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('auth_user')
     router.push('/')
   }
 
@@ -39,7 +34,7 @@ export default function Nav() {
             Logout
           </button>
         ) : (
-          <Link href="/" className="btn-primary" style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', borderRadius: 8 }}>
+          <Link href="/login" className="btn-primary" style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', borderRadius: 8 }}>
             Login
           </Link>
         )}

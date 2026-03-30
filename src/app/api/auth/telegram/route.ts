@@ -47,9 +47,10 @@ export async function POST(request: Request) {
       telegramFirstName: user.telegramFirstName,
     })
     
-    // Create response with cookie
-    const response = NextResponse.json({
+    // Return token to client (no cookie)
+    return NextResponse.json({
       success: true,
+      token: sessionToken,
       user: {
         id: user.id,
         telegramId: user.telegramId.toString(),
@@ -57,22 +58,6 @@ export async function POST(request: Request) {
         telegramFirstName: user.telegramFirstName,
       }
     })
-    
-    // Set cookie with explicit options
-    response.cookies.set({
-      name: 'pump_agent_session',
-      value: sessionToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-      domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
-    })
-    
-    console.log('[Auth/telegram] Cookie set')
-    
-    return response
   } catch (error) {
     console.error('[Auth/telegram] Error:', error)
     return NextResponse.json(
