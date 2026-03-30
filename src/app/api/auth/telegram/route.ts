@@ -1,7 +1,6 @@
 // src/app/api/auth/telegram/route.ts
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { signSession, verifyTelegramAuth } from '@/lib/auth'
+import { signSession, verifyTelegramAuth, setSessionCookie } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
 export async function POST(request: Request) {
@@ -46,19 +45,10 @@ export async function POST(request: Request) {
       telegramFirstName: user.telegramFirstName,
     })
     
-    // Set cookie
-    const cookieStore = await cookies()
-    cookieStore.set({
-      name: 'pump_agent_session',
-      value: sessionToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/',
-    })
+    // Set cookie using the helper function
+    await setSessionCookie(sessionToken)
     
-    console.log('[Auth/telegram] Session cookie set')
+    console.log('[Auth/telegram] Session cookie set successfully')
     
     return NextResponse.json({
       success: true,

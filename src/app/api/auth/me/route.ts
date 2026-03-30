@@ -7,18 +7,25 @@ import prisma from '@/lib/prisma'
 export async function GET() {
   try {
     const cookieStore = await cookies()
+    const allCookies = cookieStore.getAll()
+    console.log('[Auth/me] All cookies:', allCookies.map(c => c.name))
+    
     const token = cookieStore.get('pump_agent_session')?.value
     
     if (!token) {
       console.log('[Auth/me] No session token found')
-      return NextResponse.json({ user: null, error: 'No session' }, { status: 401 })
+      return NextResponse.json({ user: null }, { status: 401 })
     }
+    
+    console.log('[Auth/me] Session token found, verifying...')
     
     const session = await verifySession(token)
     if (!session) {
       console.log('[Auth/me] Invalid session token')
-      return NextResponse.json({ user: null, error: 'Invalid session' }, { status: 401 })
+      return NextResponse.json({ user: null }, { status: 401 })
     }
+    
+    console.log('[Auth/me] Session verified for user:', session.id)
     
     const user = await prisma.user.findUnique({
       where: { id: session.id },
@@ -36,7 +43,7 @@ export async function GET() {
     
     if (!user) {
       console.log('[Auth/me] User not found:', session.id)
-      return NextResponse.json({ user: null, error: 'User not found' }, { status: 401 })
+      return NextResponse.json({ user: null }, { status: 401 })
     }
     
     // Convert BigInt to string for JSON serialization
