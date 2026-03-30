@@ -2,16 +2,10 @@
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Nav from '../app/components/Nav'
 import './globals.css'
 
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
-
-// Add TypeScript declaration for window.onTelegramAuth
-declare global {
-  interface Window {
-    onTelegramAuth?: (user: any) => void
-  }
-}
 
 // ── Animated counter ──────────────────────────────────────────────────────────
 function Counter({ end, suffix = '', duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
@@ -124,21 +118,8 @@ export default function HomePage() {
       <div className="grid-bg" />
       <div style={{ position: 'relative', zIndex: 1 }}>
 
-        {/* Nav */}
-        <nav className="nav">
-          <Link href="/" className="nav-logo">
-            <div className="logo-mark">PA</div>
-            <span className="logo-text">Pump Agent</span>
-          </Link>
-          <div className="nav-links">
-            <Link href="/leaderboard" className="nav-link">Leaderboard</Link>
-            <Link href="/tokens" className="nav-link">Tokens</Link>
-            <Link href="/dashboard" className="nav-link">Dashboard</Link>
-            <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', borderRadius: 8 }}>
-              <TgIcon /> Launch Token
-            </a>
-          </div>
-        </nav>
+        {/* Nav - Using the Nav component */}
+        <Nav />
 
         {/* Hero */}
         <div className="hero-grid">
