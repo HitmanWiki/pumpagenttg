@@ -1,10 +1,9 @@
-// src/app/layout.tsx
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Syne, DM_Mono } from 'next/font/google'
 import './globals.css'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
+const syne = Syne({ variable: '--font-syne', subsets: ['latin'], weight: ['400','500','600','700','800'] })
+const dmMono = DM_Mono({ variable: '--font-mono', subsets: ['latin'], weight: ['400','500'] })
 
 export const metadata: Metadata = {
   title: 'Pump Agent — Launch Tokens with Telegram',
@@ -13,8 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#080c0a] text-white min-h-screen`}>
+    <html lang="en">
+      <body className={`${syne.variable} ${dmMono.variable}`}>
         {children}
       </body>
     </html>

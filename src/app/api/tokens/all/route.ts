@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { serializeBigInt } from '@/lib/utils'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -42,8 +43,11 @@ export async function GET(req: NextRequest) {
     prisma.token.count({ where }),
   ])
 
+  // Serialize BigInt values to numbers
+  const serializedTokens = serializeBigInt(tokens)
+
   return NextResponse.json({
-    tokens,
+    tokens: serializedTokens,
     pagination: {
       page,
       limit,

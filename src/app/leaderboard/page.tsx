@@ -1,211 +1,165 @@
 'use client'
-// src/app/leaderboard/page.tsx
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Nav from '../components/Nav'
+import Footer from '../components/Footer'
 
-const MEDALS = ['🥇', '🥈', '🥉']
+const MEDALS = ['🥇','🥈','🥉']
+
+function formatMC(n:number){
+  if(!n||n===0)return'—'
+  if(n>=1_000_000)return`$${(n/1_000_000).toFixed(2)}M`
+  if(n>=1_000)return`$${(n/1_000).toFixed(1)}K`
+  return`$${n.toFixed(0)}`
+}
 
 export default function LeaderboardPage() {
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [data,setData]       = useState<any>(null)
+  const [loading,setLoading] = useState(true)
+  const [search,setSearch]   = useState('')
+  const [page,setPage]       = useState(1)
 
-  useEffect(() => {
-    const t = setTimeout(() => fetchData(), 300)
-    return () => clearTimeout(t)
-  }, [search, page])
+  useEffect(()=>{
+    const t=setTimeout(()=>fetchData(),300)
+    return()=>clearTimeout(t)
+  },[search,page])
 
-  async function fetchData() {
+  async function fetchData(){
     setLoading(true)
-    const res = await fetch(`/api/leaderboard?page=${page}&limit=10&search=${encodeURIComponent(search)}`)
-    if (res.ok) setData(await res.json())
+    const res=await fetch(`/api/leaderboard?page=${page}&limit=10&search=${encodeURIComponent(search)}`)
+    if(res.ok)setData(await res.json())
     setLoading(false)
   }
 
-  const tokens = data?.tokens || []
-  const pagination = data?.pagination || {}
+  const tokens   = data?.tokens||[]
+  const pg       = data?.pagination||{}
   const campaign = data?.campaign
 
-  return (
-    <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-[#1a2e22]">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-[#00C896] flex items-center justify-center text-black font-bold text-xs">P</div>
-          <span className="font-semibold text-sm">Pump Agent</span>
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/tokens" className="text-sm text-[#6b7f72] hover:text-[#00C896]">Tokens</Link>
-          <Link href="/dashboard" className="btn-primary text-sm">Dashboard</Link>
-        </div>
-      </nav>
+  return(
+    <>
+      <div className="grid-bg"/>
+      <div className="page">
+        <Nav/>
 
-      <div className="max-w-4xl mx-auto px-6 py-12">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 bg-[#0e1610] border border-[#1a2e22] rounded-full px-4 py-1.5 text-xs text-[#00C896] mb-4">
-            🏆 TOKEN LEADERBOARD
+        <div className="page-header">
+          <div style={{textAlign:'center',maxWidth:600,margin:'0 auto'}}>
+            <div className="badge" style={{marginBottom:'1rem'}}><span className="badge-dot"/>Token Leaderboard</div>
+            <h1 className="section-title">Top Tokens by Market Cap</h1>
+            <p className="section-sub" style={{margin:'0 auto'}}>Every token launched through Pump Agent, ranked live by market cap.</p>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Top Tokens by Market Cap</h1>
-          <p className="text-[#6b7f72] text-sm">Every token launched through Pump Agent, ranked live by market cap.</p>
         </div>
 
-        {/* Active Campaign Banner */}
-        {campaign && (
-          <div className="border border-amber-500/30 bg-amber-500/5 rounded-xl p-5 mb-8 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">🎁</span>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-amber-500/20 text-amber-400 text-xs rounded-full px-2 py-0.5">Live</span>
-                  <span className="font-semibold text-sm">Active Campaign — Reach ${campaign.goal_value?.toLocaleString()} MC</span>
+        <div className="section" style={{paddingTop:'1rem'}}>
+
+          {/* Campaign banner */}
+          {campaign&&(
+            <div style={{border:'1px solid rgba(200,168,0,0.25)',background:'rgba(200,168,0,0.04)',borderRadius:16,padding:'1.5rem',marginBottom:'2rem',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'1rem'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
+                <div style={{fontSize:'1.5rem'}}>🎁</div>
+                <div>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.4rem'}}>
+                    <span className="badge amber"><span className="badge-dot"/>Live</span>
+                    <span style={{fontWeight:700,fontSize:'0.9375rem'}}>Active Campaign — Reach ${campaign.goalValue?.toLocaleString()} MC</span>
+                  </div>
+                  <p className="mono text-muted" style={{fontSize:'0.8125rem'}}>
+                    Be the <strong style={{color:'#e2ece6'}}>first</strong> token to reach{' '}
+                    <strong className="text-amber">${campaign.goalValue?.toLocaleString()} Market Cap</strong> and claim{' '}
+                    <strong className="text-green">${campaign.prizeUsd?.toLocaleString()}</strong> — winner takes all.
+                  </p>
                 </div>
-                <p className="text-xs text-[#6b7f72]">
-                  Be the <strong className="text-[#e8f0ea]">first</strong> token to reach{' '}
-                  <strong className="text-amber-400">${campaign.goal_value?.toLocaleString()} Market Cap</strong> and claim{' '}
-                  <strong className="text-[#00C896]">${campaign.prize_usd?.toLocaleString()}</strong> — winner takes all.
-                </p>
+              </div>
+              <div style={{display:'flex',gap:'2rem',textAlign:'center'}}>
+                {[
+                  {label:'WINNER', val:campaign.winnerToken?'🏆':'—', sub:'unclaimed'},
+                  {label:'GOAL',   val:`$${(campaign.goalValue/1000).toFixed(0)}K`, sub:'market cap'},
+                  {label:'PRIZE',  val:`$${campaign.prizeUsd?.toLocaleString()}`, sub:'first to reach', green:true},
+                ].map(c=>(
+                  <div key={c.label}>
+                    <div className="section-label" style={{marginBottom:'0.25rem'}}>{c.label}</div>
+                    <div style={{fontSize:'1.25rem',fontWeight:800,color:c.green?'#00C896':'#e2ece6'}}>{c.val}</div>
+                    <div className="mono text-dimmer" style={{fontSize:'0.72rem'}}>{c.sub}</div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="hidden md:flex items-center gap-6 text-center">
-              <div>
-                <div className="text-xs text-[#6b7f72] mb-1">WINNER</div>
-                <div className="text-sm font-mono text-[#6b7f72]">{campaign.winner_token_id ? '🏆' : '—'}</div>
-                <div className="text-xs text-[#4a5e51]">unclaimed</div>
-              </div>
-              <div>
-                <div className="text-xs text-[#6b7f72] mb-1">GOAL</div>
-                <div className="text-lg font-bold">${(campaign.goal_value / 1000).toFixed(0)}K</div>
-                <div className="text-xs text-[#4a5e51]">market cap</div>
-              </div>
-              <div>
-                <div className="text-xs text-[#00C896] mb-1">PRIZE</div>
-                <div className="text-lg font-bold text-[#00C896]">${campaign.prize_usd?.toLocaleString()}</div>
-                <div className="text-xs text-[#4a5e51]">first to reach</div>
-              </div>
-            </div>
+          )}
+
+          {/* Search */}
+          <div style={{position:'relative',marginBottom:'1.5rem'}}>
+            <span style={{position:'absolute',left:'1rem',top:'50%',transform:'translateY(-50%)',color:'#3a4e42'}}>🔍</span>
+            <input className="input" style={{paddingLeft:'2.5rem'}} placeholder="Search by token name, ticker, or mint address..."
+              value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/>
           </div>
-        )}
 
-        {/* Search */}
-        <div className="relative mb-6">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a5e51]">🔍</span>
-          <input
-            type="text"
-            placeholder="Search by token name, ticker, or mint address..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
-            className="w-full bg-[#0e1610] border border-[#1a2e22] rounded-xl pl-10 pr-4 py-3 text-sm text-[#e8f0ea] placeholder-[#4a5e51] focus:border-[#00C896] focus:outline-none transition-colors"
-          />
-        </div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'0.75rem',marginBottom:'1rem'}} className="mono text-muted">
+            <span>Showing {tokens.length} of {pg.total||0} tokens</span>
+            <span>Page {pg.page||1} / {pg.totalPages||1}</span>
+          </div>
 
-        {/* Count */}
-        <div className="flex justify-between items-center text-xs text-[#6b7f72] mb-4">
-          <span>Showing {tokens.length} of {pagination.total || 0} tokens</span>
-          <span>Page {pagination.page || 1} / {pagination.pages || 1}</span>
-        </div>
-
-        {/* Token List */}
-        <div className="space-y-2">
-          {loading ? (
-            [...Array(5)].map((_, i) => (
-              <div key={i} className="card p-4 animate-pulse flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-[#1a2e22]"></div>
-                <div className="flex-1">
-                  <div className="h-4 bg-[#1a2e22] rounded w-1/3 mb-2"></div>
-                  <div className="h-3 bg-[#1a2e22] rounded w-1/4"></div>
+          {/* Token list */}
+          <div className="card" style={{overflow:'hidden'}}>
+            {loading ? (
+              [...Array(5)].map((_,i)=>(
+                <div key={i} className="data-row">
+                  <div className="skeleton" style={{width:32,height:32,borderRadius:'50%',flexShrink:0}}/>
+                  <div style={{flex:1}}><div className="skeleton" style={{height:14,width:'40%',marginBottom:6}}/><div className="skeleton" style={{height:11,width:'25%'}}/></div>
+                  <div className="skeleton" style={{height:20,width:80}}/>
                 </div>
-                <div className="h-5 bg-[#1a2e22] rounded w-20"></div>
+              ))
+            ) : tokens.length===0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🔍</div>
+                <div className="empty-title">No tokens found</div>
+                <div className="empty-sub">{search?`No results for "${search}"`:'No tokens launched yet'}</div>
               </div>
-            ))
-          ) : tokens.length === 0 ? (
-            <div className="card p-12 text-center text-[#6b7f72]">
-              No tokens found{search ? ` for "${search}"` : ''}
-            </div>
-          ) : (
-            tokens.map((token: any, i: number) => {
-              const rank = ((page - 1) * 10) + i + 1
-              const pct = token.market_cap_usd && campaign
-                ? Math.min(100, (token.market_cap_usd / campaign.goal_value) * 100)
-                : 2
-              return (
-                <div key={token.id} className="card p-4 flex items-center gap-4 hover:border-[#00C896]/30 transition-colors cursor-pointer">
-                  {/* Rank */}
-                  <div className="w-8 text-center">
-                    {rank <= 3
-                      ? <span className="text-lg">{MEDALS[rank - 1]}</span>
-                      : <span className="text-[#4a5e51] text-sm font-mono">{rank}</span>
-                    }
+            ) : tokens.map((t:any,i:number)=>{
+              const rank=(page-1)*10+i+1
+              const pct=campaign?Math.min(100,(t.marketCapUsd/campaign.goalValue)*100):0
+              return(
+                <div key={t.id} className="data-row">
+                  <div style={{width:32,textAlign:'center',flexShrink:0}}>
+                    {rank<=3?<span style={{fontSize:'1.1rem'}}>{MEDALS[rank-1]}</span>
+                      :<span className="mono text-dimmer" style={{fontSize:'0.8125rem'}}>{rank}</span>}
                   </div>
-
-                  {/* Logo */}
-                  <div className="w-10 h-10 rounded-full bg-[#1a2e22] flex items-center justify-center text-[#00C896] font-bold text-sm overflow-hidden flex-shrink-0">
-                    {token.image_url
-                      ? <img src={token.image_url} alt={token.name} className="w-full h-full object-cover" />
-                      : token.symbol?.slice(0, 2)
-                    }
+                  <div className="token-avatar">
+                    {t.imageUrl?<img src={t.imageUrl} alt={t.name}/>:t.symbol?.slice(0,2)}
                   </div>
-
-                  {/* Name + creator */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-semibold text-sm truncate">{token.name}</span>
-                      <span className="text-[#00C896] text-xs font-mono">${token.symbol}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.15rem'}}>
+                      <span style={{fontWeight:600,fontSize:'0.9rem',letterSpacing:'-0.2px'}}>{t.name}</span>
+                      <span className="text-green mono" style={{fontSize:'0.75rem'}}>{'$'+t.symbol}</span>
                     </div>
-                    <div className="text-xs text-[#4a5e51]">
-                      by @{token.users?.telegram_username || token.users?.telegram_first_name || 'unknown'}
-                    </div>
+                    <div className="mono text-dimmer" style={{fontSize:'0.72rem'}}>by @{t.user?.telegramUsername||'unknown'}</div>
                   </div>
-
-                  {/* Progress to campaign goal */}
-                  {campaign && (
-                    <div className="hidden md:flex items-center gap-3 w-48">
-                      <div className="flex-1 h-1.5 bg-[#1a2e22] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#00C896] rounded-full transition-all" style={{ width: `${pct}%` }}></div>
+                  {campaign&&(
+                    <div style={{width:160,display:'flex',alignItems:'center',gap:'0.75rem'}}>
+                      <div className="progress-track" style={{flex:1}}>
+                        <div className="progress-fill" style={{width:`${pct}%`}}/>
                       </div>
-                      <span className="text-xs text-[#6b7f72] whitespace-nowrap">{pct.toFixed(0)}% to goal</span>
+                      <span className="mono text-muted" style={{fontSize:'0.72rem',whiteSpace:'nowrap'}}>{pct.toFixed(0)}% to goal</span>
                     </div>
                   )}
-
-                  {/* Market cap */}
-                  <div className="text-right">
-                    <div className={`font-bold text-sm ${token.market_cap_usd > 0 ? 'text-[#00C896]' : 'text-[#4a5e51]'}`}>
-                      {token.market_cap_usd > 0 ? `$${token.market_cap_usd.toLocaleString()}` : '—'}
-                    </div>
-                    {token.pump_fun_url && (
-                      <a href={token.pump_fun_url} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-[#4a5e51] hover:text-[#00C896] transition-colors"
-                        onClick={e => e.stopPropagation()}>
-                        pump.fun ↗
-                      </a>
-                    )}
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    <div style={{fontWeight:700,color:t.marketCapUsd>0?'#00C896':'#3a4e42',fontSize:'0.9375rem'}}>{formatMC(t.marketCapUsd)}</div>
+                    {t.pumpFunUrl&&<a href={t.pumpFunUrl} target="_blank" rel="noopener noreferrer" className="mono text-dimmer" style={{fontSize:'0.72rem',textDecoration:'none',transition:'color 0.2s'}}
+                      onMouseEnter={e=>(e.currentTarget.style.color='#00C896')} onMouseLeave={e=>(e.currentTarget.style.color='')}>pump.fun ↗</a>}
                   </div>
                 </div>
               )
-            })
+            })}
+          </div>
+
+          {/* Pagination */}
+          {pg.totalPages>1&&(
+            <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'0.75rem',marginTop:'2rem'}}>
+              <button className="btn-ghost btn-sm" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>← Prev</button>
+              <span className="mono text-muted" style={{fontSize:'0.875rem'}}>{page} / {pg.totalPages}</span>
+              <button className="btn-ghost btn-sm" onClick={()=>setPage(p=>Math.min(pg.totalPages,p+1))} disabled={page===pg.totalPages}>Next →</button>
+            </div>
           )}
         </div>
-
-        {/* Pagination */}
-        {pagination.pages > 1 && (
-          <div className="flex justify-center gap-2 mt-8">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="btn-secondary text-sm disabled:opacity-40"
-            >← Prev</button>
-            <span className="flex items-center px-4 text-sm text-[#6b7f72]">
-              {page} / {pagination.pages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
-              disabled={page === pagination.pages}
-              className="btn-secondary text-sm disabled:opacity-40"
-            >Next →</button>
-          </div>
-        )}
+        <Footer/>
       </div>
-    </div>
+    </>
   )
 }

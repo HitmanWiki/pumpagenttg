@@ -110,17 +110,20 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
       },
       mint: bs58.encode(mintKeypair.secretKey),
       denominatedInSol: 'true',
-      amount: devBuySol, // 0 = no dev buy
+      amount: String(devBuySol), // PumpPortal requires string
       slippage: 10,
       priorityFee: 0.0005,
       pool: 'pump',
     }
 
     const deployResponse = await fetch(
-      `https://pumpportal.fun/api/trade?api-key=${process.env.PUMPPORTAL_API_KEY}`,
+      'https://pumpportal.fun/api/trade',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.PUMPPORTAL_API_KEY}`,
+        },
         body: JSON.stringify(tradePayload),
       }
     )

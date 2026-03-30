@@ -26,7 +26,10 @@ bot.command('start', async (ctx) => {
     `/fees — Check claimable fees\n` +
     `/help — Show this message\n\n` +
     `📊 [View Dashboard](${appUrl}/dashboard)`,
-    { parse_mode: 'Markdown', disable_web_page_preview: true }
+    { 
+      parse_mode: 'Markdown',
+      link_preview_options: { is_disabled: true }
+    }
   )
 })
 
@@ -86,7 +89,10 @@ bot.command('tokens', async (ctx) => {
 
   msg += `[View full dashboard →](${appUrl}/dashboard)`
 
-  await ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true })
+  await ctx.reply(msg, { 
+    parse_mode: 'Markdown',
+    link_preview_options: { is_disabled: true }
+  })
 })
 
 // ============================================================
@@ -122,7 +128,10 @@ bot.command('fees', async (ctx) => {
     `💰 Available to claim: *${claimableSol} SOL*\n` +
     `📊 Active tokens: ${user.tokens.length}\n\n` +
     `[Claim fees on dashboard →](${appUrl}/claim)`,
-    { parse_mode: 'Markdown', disable_web_page_preview: true }
+    { 
+      parse_mode: 'Markdown',
+      link_preview_options: { is_disabled: true }
+    }
   )
 })
 
@@ -311,7 +320,10 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       `📋 CA: \`${deployResult.mintAddress}\`\n\n` +
       `💰 You'll earn 90% of all trading fees.\n` +
       `📊 [Track & claim fees →](${appUrl}/dashboard)`,
-      { parse_mode: 'Markdown', disable_web_page_preview: true }
+      { 
+        parse_mode: 'Markdown',
+        link_preview_options: { is_disabled: true }
+      }
     )
 
   } catch (error: any) {

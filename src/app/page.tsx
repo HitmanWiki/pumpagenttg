@@ -1,129 +1,336 @@
-// src/app/page.tsx
+'use client'
 import Link from 'next/link'
+import { useState, useEffect, useRef } from 'react'
+import './globals.css'
 
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME 
+
+// ── Animated counter ──────────────────────────────────────────────────────────
+function Counter({ end, suffix = '', duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
+  const [count, setCount] = useState(0)
+  const ref = useRef<HTMLSpanElement>(null)
+  const started = useRef(false)
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !started.current) {
+        started.current = true
+        const start = Date.now()
+        const tick = () => {
+          const elapsed = Date.now() - start
+          const progress = Math.min(elapsed / duration, 1)
+          const eased = 1 - Math.pow(1 - progress, 3)
+          setCount(Math.floor(eased * end))
+          if (progress < 1) requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }
+    }, { threshold: 0.3 })
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [end, duration])
+  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>
+}
+
+// ── Terminal ──────────────────────────────────────────────────────────────────
+const LINES = [
+  { delay: 0,    text: '$ [attach token image]',             color: '#4a5e52' },
+  { delay: 700,  text: '/launch Moon Pepe $MPEPE',           color: '#00C896' },
+  { delay: 1300, text: 'description: The dankest frog on Solana', color: '#6b7f72' },
+  { delay: 1900, text: 'website: https://moonpepe.xyz',      color: '#6b7f72' },
+  { delay: 2700, text: '⏳ Uploading to IPFS...',            color: '#c8a800' },
+  { delay: 3500, text: '⛓  Deploying on pump.fun...',        color: '#c8a800' },
+  { delay: 4500, text: '✅ Moon Pepe ($MPEPE) is LIVE!',     color: '#00C896' },
+  { delay: 5100, text: '🔗 pump.fun/coin/7fZK58DP...',       color: '#00C896' },
+  { delay: 5700, text: '💰 Earning 90% of trading fees',     color: '#00C896' },
+]
+
+function Terminal() {
+  const [visible, setVisible] = useState<number[]>([])
+  useEffect(() => {
+    const timers = LINES.map((line, i) =>
+      setTimeout(() => setVisible(v => [...v, i]), line.delay)
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [])
+  return (
+    <div className="terminal-card">
+      <div className="terminal-bar">
+        <span className="t-dot r" /><span className="t-dot y" /><span className="t-dot g" />
+        <span className="terminal-title">Telegram · @PumpAgentBot · DM</span>
+      </div>
+      <div className="terminal-body">
+        {LINES.map((line, i) => (
+          <div key={i} className="t-line" style={{
+            color: line.color,
+            opacity: visible.includes(i) ? 1 : 0,
+            transform: visible.includes(i) ? 'translateY(0)' : 'translateY(6px)',
+          }}>
+            {line.text}
+          </div>
+        ))}
+        <span className="t-cursor" />
+      </div>
+    </div>
+  )
+}
+
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+const FAQS = [
+  { q: 'How much does it cost to launch a token?', a: 'Launching is completely free. No upfront cost, no platform fee. The first buyer of your token covers the on-chain creation fee automatically via pump.fun.' },
+  { q: 'How are trading fees collected?', a: 'Every trade on pump.fun generates fees. Each token gets a dedicated Solana wallet that accumulates these fees automatically. You claim 90% directly to your wallet anytime.' },
+  { q: 'Is my wallet safe? Do you hold my keys?', a: 'We are fully non-custodial. Each token wallet keypair is encrypted at rest. Your personal wallet keys are never stored — only used to receive payouts.' },
+  { q: 'What are the token name and ticker rules?', a: 'Token name: 2–32 characters. Ticker: 2–10 letters only (no numbers or symbols), with the $ prefix. You must attach an image to your Telegram message.' },
+  { q: 'Can I launch multiple tokens?', a: 'Yes, unlimited. Each token gets its own dedicated wallet, fee tracking, and dashboard entry. Launch as many as you want.' },
+  { q: "What happens after the bonding curve completes?", a: "When your token graduates from pump.fun's bonding curve, it moves to Raydium. Your token status updates to Graduated on your dashboard automatically." },
+]
+
+function FAQ() {
+  const [open, setOpen] = useState<number | null>(null)
+  return (
+    <div className="faq-list">
+      {FAQS.map((faq, i) => (
+        <div key={i} className={`faq-item${open === i ? ' open' : ''}`} onClick={() => setOpen(open === i ? null : i)}>
+          <div className="faq-q">
+            <span>{faq.q}</span>
+            <span className="faq-icon">{open === i ? '−' : '+'}</span>
+          </div>
+          {open === i && <div className="faq-a">{faq.a}</div>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const TgIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.26 14.48l-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.194 1.006.131.893.077z"/>
+  </svg>
+)
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'YourBotName'
+  const tgLink = `https://t.me/${BOT_USERNAME}`
 
   return (
-    <main className="min-h-screen flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-[#1a2e22]">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#00C896] flex items-center justify-center text-black font-bold text-sm">P</div>
-          <span className="font-semibold text-[#e8f0ea]">Pump Agent</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link href="/leaderboard" className="text-sm text-[#6b7f72] hover:text-[#00C896] transition-colors">Leaderboard</Link>
-          <Link href="/tokens" className="text-sm text-[#6b7f72] hover:text-[#00C896] transition-colors">Tokens</Link>
-          <Link href="/dashboard" className="btn-primary text-sm">Dashboard</Link>
-        </div>
-      </nav>
+    <>
+      <div className="grid-bg" />
+      <div style={{ position: 'relative', zIndex: 1 }}>
 
-      {/* Hero */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-2 bg-[#0e1610] border border-[#1a2e22] rounded-full px-4 py-2 text-sm text-[#00C896] mb-8">
-          <span className="live-dot"></span>
-          Built on Solana · pump.fun
-        </div>
-
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 max-w-3xl">
-          Launch Tokens<br />
-          <span className="text-[#00C896]">with Telegram</span>
-        </h1>
-
-        <p className="text-[#6b7f72] text-lg md:text-xl max-w-xl mb-12">
-          DM our bot with your token name and ticker to instantly deploy on Solana via pump.fun. Track your tokens and claim trading fees from your dashboard.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-4 mb-16">
-          <a
-            href={`https://t.me/${botUsername}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-primary flex items-center gap-2 text-base px-6 py-3"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.26 14.48l-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.194 1.006.131.893.077z"/>
-            </svg>
-            Launch via Telegram
-          </a>
-          <Link href="/dashboard" className="btn-secondary text-base px-6 py-3">
-            View Dashboard
+        {/* Nav */}
+        <nav className="nav">
+          <Link href="/" className="nav-logo">
+            <div className="logo-mark">PA</div>
+            <span className="logo-text">Pump Agent</span>
           </Link>
+          <div className="nav-links">
+            <Link href="/leaderboard" className="nav-link">Leaderboard</Link>
+            <Link href="/tokens" className="nav-link">Tokens</Link>
+            <Link href="/dashboard" className="nav-link">Dashboard</Link>
+            <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', borderRadius: 8 }}>
+              <TgIcon /> Launch Token
+            </a>
+          </div>
+        </nav>
+
+        {/* Hero */}
+        <div className="hero-grid">
+          <div>
+            <div className="badge fade-up-1" style={{ marginBottom: '1.75rem' }}>
+              <span className="badge-dot" /> Live on Solana · pump.fun
+            </div>
+            <h1 className="hero-title fade-up-2">
+              Launch Tokens<br />
+              <span className="accent">with a Telegram</span><br />
+              <span className="stroke">Message.</span>
+            </h1>
+            <p className="hero-sub fade-up-3">
+              DM our bot, attach an image, type /launch — your token goes live on pump.fun in under 2 seconds. No code. No wallets. No complexity.
+            </p>
+            <div className="hero-ctas fade-up-4">
+              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                <TgIcon /> Open Telegram Bot
+              </a>
+              <Link href="/leaderboard" className="btn-ghost">View Leaderboard →</Link>
+            </div>
+            <div className="hero-meta fade-up-4">
+              <span>⚡ &lt;2s deploy</span>
+              <span>🔒 Non-custodial</span>
+              <span>🌍 No KYC</span>
+            </div>
+          </div>
+          <div className="fade-up-2"><Terminal /></div>
+        </div>
+
+        {/* Stats */}
+        <div className="stats-section">
+          <div className="stats-grid">
+            {[
+              { end: 0,  suffix: '%', label: 'Launch cost',    sub: 'completely free' },
+              { end: 90, suffix: '%', label: 'Fees you keep',  sub: 'per trade' },
+              { end: 2,  suffix: 's', label: 'Deploy time',    sub: 'on Solana mainnet' },
+              { end: 24, suffix: '/7',label: 'Availability',   sub: 'worldwide, no KYC' },
+            ].map((s, i) => (
+              <div key={i}>
+                <div className="stat-val"><Counter end={s.end} suffix={s.suffix} /></div>
+                <div className="stat-label">{s.label}</div>
+                <div className="stat-sub">{s.sub}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* How it works */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-3xl w-full mb-24">
-          {[
-            {
-              step: '01',
-              title: 'DM the Bot',
-              desc: 'Send a photo + /launch Token Name $TICKER to our Telegram bot'
-            },
-            {
-              step: '02',
-              title: 'Auto Deploy',
-              desc: 'Token instantly deployed on pump.fun with IPFS metadata in under 2 seconds'
-            },
-            {
-              step: '03',
-              title: 'Earn & Claim',
-              desc: 'Accumulate 90% of all trading fees. Claim directly to your Solana wallet'
-            }
-          ].map((item) => (
-            <div key={item.step} className="card p-6 text-left">
-              <div className="text-[#00C896] font-mono text-sm mb-3">{item.step}</div>
-              <h3 className="font-semibold text-[#e8f0ea] mb-2">{item.title}</h3>
-              <p className="text-[#6b7f72] text-sm leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
-        </div>
+        <div className="section">
+          <div className="section-label">// How it works</div>
+          <h2 className="section-title">From idea to live token<br />in three steps</h2>
+          <p className="section-sub">No smart contract knowledge. No wallet setup. Just Telegram.</p>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-8 max-w-lg w-full mb-24">
-          {[
-            { label: 'Platform Fee', value: '0%', sub: 'launch is free' },
-            { label: 'You Earn', value: '90%', sub: 'of trading fees' },
-            { label: 'Deploy Time', value: '<2s', sub: 'on Solana' },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="text-3xl font-bold text-[#00C896] mb-1">{stat.value}</div>
-              <div className="text-xs text-[#6b7f72] uppercase tracking-wider">{stat.label}</div>
-              <div className="text-xs text-[#4a5e51] mt-0.5">{stat.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Command example */}
-        <div className="card max-w-lg w-full p-6 text-left">
-          <div className="flex items-center gap-2 mb-4 text-xs text-[#6b7f72] uppercase tracking-wider">
-            <span className="w-3 h-3 rounded-full bg-red-500/60"></span>
-            <span className="w-3 h-3 rounded-full bg-yellow-500/60"></span>
-            <span className="w-3 h-3 rounded-full bg-green-500/60"></span>
-            <span className="ml-2">Telegram · DM</span>
+          <div className="steps-grid">
+            {[
+              { num: '01', title: 'DM the Bot', desc: 'Open Telegram, send your token image with caption: /launch Token Name $TICKER — optionally add description: and website: lines below.' },
+              { num: '02', title: 'Auto Deploy', desc: 'Your image uploads to IPFS, metadata is signed on-chain, and your token is live on pump.fun with an instant liquidity pool in under 2 seconds.' },
+              { num: '03', title: 'Earn & Claim', desc: '90% of every trading fee flows to your token wallet automatically. Claim anytime to any Solana address directly from your dashboard.' },
+            ].map((s) => (
+              <div key={s.num} className="step-card">
+                <div className="step-num">{s.num}</div>
+                <div className="step-title">{s.title}</div>
+                <p className="step-desc">{s.desc}</p>
+              </div>
+            ))}
           </div>
-          <div className="font-mono text-sm space-y-3">
-            <div className="text-[#6b7f72]">{'// Step 1 — Send a photo, then type:'}</div>
+
+          <div className="format-box">
+            <div className="format-mono-label">// Exact command format</div>
+            {[
+              { key: 'Required', val: <><span className="hl">/launch</span> My Token Name <span className="hl">$MTK</span></> },
+              { key: 'Optional', val: <><span className="dim">description:</span> A brief token description</> },
+              { key: 'Optional', val: <><span className="dim">website:</span> https://yoursite.com</> },
+            ].map((row, i) => (
+              <div key={i} className="format-row">
+                <span className="format-key">{row.key}</span>
+                <span className="format-val">{row.val}</span>
+              </div>
+            ))}
+            <div className="format-divider" />
+            <div className="format-row">
+              <span className="format-key">Rules</span>
+              <span className="format-val" style={{ color: '#5a7264', fontSize: '0.8125rem' }}>
+                Name: 2–32 chars · Ticker: 2–10 letters only · Must attach an image · $ prefix required
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="section" style={{ paddingTop: 0 }}>
+          <div className="section-label">// Why Pump Agent</div>
+          <h2 className="section-title">Everything you need,<br />nothing you don't</h2>
+          <div className="feature-grid">
+            {[
+              { icon: '⚡', title: 'Lightning Fast',     desc: 'Under 2 seconds from command to live token. Optimized Solana infrastructure with priority fees baked in.' },
+              { icon: '🔒', title: 'Non-Custodial',      desc: 'Your wallet keys are never stored. Each token wallet is encrypted at rest, decrypted only to process claims.' },
+              { icon: '💸', title: '90% Fee Share',      desc: 'Every trade generates fees. You keep 90% automatically — no lock-up periods, no vesting, claim anytime.' },
+              { icon: '🌍', title: 'Global & Open',      desc: 'Available 24/7 worldwide. No geographic restrictions, no KYC, no account creation required.' },
+              { icon: '📊', title: 'Live Dashboard',     desc: "Track market cap, volume, fees earned, and claim history for every token you've ever launched." },
+              { icon: '🏆', title: 'Campaigns & Prizes', desc: 'Compete in market cap challenges to win prizes. First token to reach the goal takes the pot.' },
+              { icon: '🤖', title: 'Bot Commands',       desc: '/tokens, /fees, /help — manage everything from Telegram without ever opening a browser.' },
+              { icon: '🔗', title: 'pump.fun Native',    desc: "Built on pump.fun's proven smart contracts with 100M+ in cumulative volume. Battle-tested." },
+              { icon: '∞',  title: 'Unlimited Tokens',  desc: 'Launch as many tokens as you want. Each gets its own dedicated wallet, tracking, and fee stream.' },
+            ].map((f) => (
+              <div key={f.title} className="feature-cell">
+                <div className="feature-icon">{f.icon}</div>
+                <div className="feature-title">{f.title}</div>
+                <p className="feature-desc">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Fee breakdown */}
+        <div className="fee-section">
+          <div className="fee-grid">
             <div>
-              <span className="text-[#00C896]">/launch</span>
-              <span className="text-[#e8f0ea]"> My Awesome Token </span>
-              <span className="text-[#00C896]">$MAT</span>
+              <div className="section-label">// Transparent economics</div>
+              <h2 className="section-title">You keep<br /><span style={{ color: '#00C896' }}>90%</span> of everything</h2>
+              <p className="section-sub" style={{ marginTop: '1rem' }}>
+                Every trade on pump.fun generates creator fees. We split them fairly and automatically — no claiming delays, no hidden cuts.
+              </p>
+              <div className="fee-bar-wrap">
+                <div className="fee-bar-labels">
+                  <span style={{ color: '#00C896' }}>You · 90%</span>
+                  <span style={{ color: '#c8a800' }}>Platform · 10%</span>
+                </div>
+                <div className="fee-bar">
+                  <div className="fee-bar-you" />
+                  <div className="fee-bar-plat" />
+                </div>
+                <div className="fee-legend">
+                  <span><span className="legend-dot" style={{ background: '#00C896' }} /> Goes directly to your wallet</span>
+                  <span><span className="legend-dot" style={{ background: '#c8a800' }} /> Keeps platform running</span>
+                </div>
+              </div>
+              <p style={{ marginTop: '1.5rem', fontSize: '0.8125rem', color: '#3a4e42', fontFamily: 'DM Mono, monospace' }}>
+                Minimum claim: 0.1 SOL · Launch is free · No hidden fees
+              </p>
             </div>
-            <div className="text-[#6b7f72] text-xs">description: A community-first meme token</div>
-            <div className="text-[#6b7f72] text-xs">website: https://mytoken.xyz</div>
-            <div className="border-t border-[#1a2e22] pt-3 mt-3">
-              <div className="text-[#6b7f72] text-xs mb-2">{'// Bot reply on success'}</div>
-              <div className="text-[#00C896]">✅ My Awesome Token ($MAT) is LIVE on pump.fun!</div>
-              <div className="text-[#6b7f72] text-xs mt-1">🔗 pump.fun/coin/...</div>
+            <div className="fee-cards">
+              {[
+                { val: '0%',  label: 'Launch fee',      sub: 'Always free to deploy',   color: '#00C896' },
+                { val: '90%', label: 'Your cut',         sub: 'Of every trading fee',    color: '#00C896' },
+                { val: '0.1', label: 'Min claim (SOL)',  sub: 'Then claim anytime',      color: '#00C896' },
+                { val: '10%', label: 'Platform fee',     sub: 'Only on claims',          color: '#c8a800' },
+              ].map((c) => (
+                <div key={c.label} className="fee-card">
+                  <div className="fee-card-val" style={{ color: c.color }}>{c.val}</div>
+                  <div className="fee-card-name">{c.label}</div>
+                  <div className="fee-card-sub">{c.sub}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Footer */}
-      <footer className="border-t border-[#1a2e22] px-6 py-6 text-center text-xs text-[#4a5e51]">
-        Pump Agent · Built on Solana · Non-custodial · No KYC
-      </footer>
-    </main>
+        {/* FAQ */}
+        <div className="section narrow">
+          <div className="section-label">// FAQ</div>
+          <h2 className="section-title">Common questions</h2>
+          <FAQ />
+        </div>
+
+        {/* CTA */}
+        <div className="cta-section">
+          <div className="cta-glow" />
+          <div style={{ position: 'relative' }}>
+            <div className="badge" style={{ marginBottom: '1.5rem' }}>
+              <span className="badge-dot" /> Ready to launch
+            </div>
+            <h2 className="cta-title">Your token is one<br />message away</h2>
+            <p className="cta-sub">Open Telegram. DM the bot. You're live in seconds.</p>
+            <div className="cta-btns">
+              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                <TgIcon /> Launch via Telegram
+              </a>
+              <Link href="/dashboard" className="btn-ghost">View Dashboard</Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ borderTop: '1px solid rgba(0,200,150,0.06)' }}>
+          <div className="footer-inner">
+            <div className="footer-copy">
+              © {new Date().getFullYear()} Pump Agent · Built on Solana · Non-custodial · No KYC
+            </div>
+            <div className="footer-links">
+              <Link href="/leaderboard" className="footer-link">Leaderboard</Link>
+              <Link href="/tokens" className="footer-link">All Tokens</Link>
+              <Link href="/dashboard" className="footer-link">Dashboard</Link>
+              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="footer-link">Telegram</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </>
   )
 }
