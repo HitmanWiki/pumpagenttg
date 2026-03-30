@@ -1,4 +1,4 @@
-// src/lib/solana.ts
+// src/lib/solana.ts - Fix the Buffer to Blob conversion
 import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
 import bs58 from 'bs58'
 
@@ -44,6 +44,7 @@ export async function getSolBalance(publicKey: string): Promise<number> {
 
 // Helper function to convert Buffer to Blob
 function bufferToBlob(buffer: Buffer, mimeType: string): Blob {
+  // Convert Buffer to Uint8Array first
   const uint8Array = new Uint8Array(buffer)
   return new Blob([uint8Array], { type: mimeType })
 }
@@ -69,6 +70,7 @@ export interface DeployTokenResult {
   mintAddress: string
   txSignature?: string
   pumpFunUrl?: string
+  imageUrl?: string
   error?: string
 }
 
@@ -84,7 +86,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     // Step 1: Upload metadata + image to IPFS via pump.fun
     const formData = new FormData()
     
-    // Convert Buffer to Blob using helper
+    // Convert Buffer to Blob using helper function
     const imageBlob = bufferToBlob(imageBuffer, 'image/png')
     formData.append('file', imageBlob, imageFileName)
     formData.append('name', name)
@@ -108,6 +110,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 
     const ipfsData = await ipfsResponse.json()
     const metadataUri = ipfsData.metadataUri || ipfsData.uri
+    const imageUri = ipfsData.imageUri || ipfsData.image_url
 
     if (!metadataUri) {
       console.error('[deployToken] No metadata URI in response:', ipfsData)
@@ -115,6 +118,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     }
 
     console.log('[deployToken] Metadata URI:', metadataUri)
+    console.log('[deployToken] Image URI:', imageUri)
 
     // Step 2: Deploy via PumpPortal API
     const mintPublicKey = mintKeypair.publicKey.toBase58()
@@ -162,14 +166,19 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 
     const mintAddress = mintKeypair.publicKey.toBase58()
     const pumpFunUrl = `https://pump.fun/coin/${mintAddress}`
+    
+    // Get the image URL from IPFS
+    const imageUrl = imageUri || `https://ipfs.io/ipfs/${metadataUri.split('/ipfs/')[1]?.split('/')[0]}/image.png`
 
     console.log('[deployToken] Success! Token at:', pumpFunUrl)
+    console.log('[deployToken] Image URL:', imageUrl)
 
     return {
       success: true,
       mintAddress,
       txSignature,
       pumpFunUrl,
+      imageUrl,
     }
   } catch (error: any) {
     console.error('[deployToken] Error:', error)

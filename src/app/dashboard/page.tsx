@@ -318,8 +318,11 @@ function TokenCard({ token, onCopy, copied }: { token:any; onCopy:(t:string,k:st
   const feeSol = (Number(token.claimableFeesLamports)/1e9).toFixed(4)
   const date   = new Date(token.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
   
-  // Get image URL from token
-  const imageUrl = token.imageUrl || `https://img.pump.fun/icon/${token.mintAddress}`
+  // Try multiple image URL sources
+  const imageUrl = token.imageUrl || 
+                   `https://img.pump.fun/icon/${token.mintAddress}` ||
+                   `https://pump.fun/icon/${token.mintAddress}` ||
+                   `https://ipfs.io/ipfs/${token.metadataHash}/image.png`
   
   return (
     <Link href={`/token/${token.id}`} style={{ textDecoration: 'none', display: 'block' }}>
@@ -336,8 +339,9 @@ function TokenCard({ token, onCopy, copied }: { token:any; onCopy:(t:string,k:st
                 alt={token.name}
                 onError={(e) => {
                   // Fallback if image fails to load
-                  (e.target as HTMLImageElement).style.display = 'none'
-                  const parent = (e.target as HTMLImageElement).parentElement
+                  const img = e.target as HTMLImageElement
+                  img.style.display = 'none'
+                  const parent = img.parentElement
                   if (parent) {
                     parent.innerHTML = token.symbol.slice(0,2).toUpperCase()
                     parent.style.display = 'flex'

@@ -463,50 +463,52 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
 
     // Deploy the token
     console.log('[Launch] Calling deployToken...')
-    const deployResult = await deployToken({
-      name: tokenName,
-      symbol: tokenSymbol,
-      description,
-      website,
-      telegram: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}`,
-      imageBuffer,
-      imageFileName: `${tokenSymbol.toLowerCase()}.png`,
-      mintKeypair,
-      devBuySol: 0,
-    })
+    // src/lib/bot.ts - In the handleLaunch function, update the token creation
+const deployResult = await deployToken({
+  name: tokenName,
+  symbol: tokenSymbol,
+  description,
+  website,
+  telegram: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}`,
+  imageBuffer,
+  imageFileName: `${tokenSymbol.toLowerCase()}.png`,
+  mintKeypair,
+  devBuySol: 0,
+})
 
-    if (!deployResult.success) {
-      console.error('[Launch] Deployment failed:', deployResult.error)
-      await ctx.api.editMessageText(
-        ctx.chat!.id,
-        statusMsg.message_id,
-        `❌ *Launch failed*\n\n${deployResult.error || 'Unknown error. Please try again.'}`,
-        { parse_mode: 'Markdown' }
-      )
-      return
-    }
+if (!deployResult.success) {
+  console.error('[Launch] Deployment failed:', deployResult.error)
+  await ctx.api.editMessageText(
+    ctx.chat!.id,
+    statusMsg.message_id,
+    `❌ *Launch failed*\n\n${deployResult.error || 'Unknown error. Please try again.'}`,
+    { parse_mode: 'Markdown' }
+  )
+  return
+}
 
-    console.log('[Launch] Deployment successful! Pump.fun URL:', deployResult.pumpFunUrl)
+console.log('[Launch] Deployment successful! Pump.fun URL:', deployResult.pumpFunUrl)
+console.log('[Launch] Image URL:', deployResult.imageUrl)
 
-    // Save token to DB
-    await prisma.token.create({
-      data: {
-        userId: user.id,
-        name: tokenName,
-        symbol: tokenSymbol,
-        description: description || null,
-        website: website || null,
-        mintAddress: deployResult.mintAddress,
-        tokenWalletAddress: feeWallet.publicKey,
-        tokenWalletPrivKey: feeWallet.privateKey,
-        deployTx: deployResult.txSignature || null,
-        pumpFunUrl: deployResult.pumpFunUrl || null,
-        status: 'LIVE',
-        telegramChatId: BigInt(ctx.chat!.id),
-        telegramMessageId: BigInt(statusMsg.message_id),
-      }
-    })
-
+// Save token to DB with image URL
+await prisma.token.create({
+  data: {
+    userId: user.id,
+    name: tokenName,
+    symbol: tokenSymbol,
+    description: description || null,
+    website: website || null,
+    imageUrl: deployResult.imageUrl || null, // Save the image URL
+    mintAddress: deployResult.mintAddress,
+    tokenWalletAddress: feeWallet.publicKey,
+    tokenWalletPrivKey: feeWallet.privateKey,
+    deployTx: deployResult.txSignature || null,
+    pumpFunUrl: deployResult.pumpFunUrl || null,
+    status: 'LIVE',
+    telegramChatId: BigInt(ctx.chat!.id),
+    telegramMessageId: BigInt(statusMsg.message_id),
+  }
+})
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
 
     // Success message
