@@ -1,19 +1,21 @@
 // src/app/api/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import bot from '@/lib/bot'
+import { getBot } from '@/lib/bot'
 
 export async function POST(req: NextRequest) {
   try {
     // Get the update from Telegram
     const update = await req.json()
     
-    // Log the incoming update for debugging
     console.log('[Webhook] Received update:', {
       update_id: update.update_id,
       has_message: !!update.message,
       message_text: update.message?.text,
       username: update.message?.from?.username
     })
+    
+    // Get the bot (this ensures it's initialized)
+    const bot = await getBot()
     
     // Process the update with your bot
     await bot.handleUpdate(update)
@@ -31,7 +33,6 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     bot: process.env.TELEGRAM_BOT_USERNAME,
-    webhook_set: true,
     timestamp: new Date().toISOString(),
   })
 }

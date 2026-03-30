@@ -12,12 +12,12 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN)
 
-// Initialize bot immediately (not lazy)
-let initializationPromise: Promise<void> | null = null
+// Create a promise that resolves when bot is initialized
+let botReadyPromise: Promise<void> | null = null
 
-async function initBot() {
-  if (!initializationPromise) {
-    initializationPromise = (async () => {
+async function initializeBot() {
+  if (!botReadyPromise) {
+    botReadyPromise = (async () => {
       try {
         console.log('[Bot] Initializing bot...')
         await bot.init()
@@ -28,21 +28,25 @@ async function initBot() {
       }
     })()
   }
-  return initializationPromise
+  return botReadyPromise
 }
 
-// Start initialization immediately (don't wait for first request)
-initBot().catch(console.error)
+// Start initialization immediately
+initializeBot().catch(console.error)
 
 // ============================================================
 // Middleware & Error Handling
 // ============================================================
 
-// Log all updates for debugging (after init)
+// Middleware to ensure bot is initialized before processing
 bot.use(async (ctx, next) => {
-  // Ensure bot is initialized (should already be, but just in case)
-  await initBot()
-  
+  // Wait for initialization to complete
+  await initializeBot()
+  await next()
+})
+
+// Log all updates for debugging
+bot.use(async (ctx, next) => {
   console.log('[Bot] Update received:', {
     type: ctx.update.message ? 'message' : 
           ctx.update.callback_query ? 'callback' : 
@@ -442,5 +446,22 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
   }
 }
 
-// Export the bot (initialization already started)
+// Export a function that returns the bot after initialization
+export async function getBot() {
+  await initializeBot()
+  return bot
+}
+
+// For backward compatibility, also export the bot but warn
+// This ensures any existing imports still work
 export default bot
+
+// Also export a helper to check if bot is ready
+export async function isBotReady() {
+  try {
+    await initializeBot()
+    return true
+  } catch {
+    return false
+  }
+}
