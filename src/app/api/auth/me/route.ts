@@ -1,14 +1,23 @@
 // src/app/api/auth/me/route.ts
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { cookies } from 'next/headers'
+import { verifySession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
 export async function GET() {
   try {
-    const session = await getSession()
+    const cookieStore = await cookies()
+    const token = cookieStore.get('pump_agent_session')?.value
     
-    if (!session) {
+    if (!token) {
+      console.log('[Auth/me] No session token found')
       return NextResponse.json({ user: null, error: 'No session' }, { status: 401 })
+    }
+    
+    const session = await verifySession(token)
+    if (!session) {
+      console.log('[Auth/me] Invalid session token')
+      return NextResponse.json({ user: null, error: 'Invalid session' }, { status: 401 })
     }
     
     const user = await prisma.user.findUnique({
@@ -26,6 +35,7 @@ export async function GET() {
     })
     
     if (!user) {
+      console.log('[Auth/me] User not found:', session.id)
       return NextResponse.json({ user: null, error: 'User not found' }, { status: 401 })
     }
     
@@ -33,6 +43,8 @@ export async function GET() {
     const serializedUser = {
       ...user,
       telegramId: user.telegramId.toString(),
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
     }
     
     return NextResponse.json({ user: serializedUser })

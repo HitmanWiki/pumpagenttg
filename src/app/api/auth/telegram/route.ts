@@ -7,9 +7,11 @@ import prisma from '@/lib/prisma'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    console.log('[Auth/telegram] Received auth request for user:', body.id)
     
     // Verify Telegram auth data
     if (!verifyTelegramAuth(body)) {
+      console.error('[Auth/telegram] Invalid Telegram auth')
       return NextResponse.json(
         { error: 'Invalid Telegram authentication' },
         { status: 401 }
@@ -34,6 +36,8 @@ export async function POST(request: Request) {
       },
     })
     
+    console.log('[Auth/telegram] User found/created:', user.id)
+    
     // Create session token
     const sessionToken = await signSession({
       id: user.id,
@@ -54,17 +58,19 @@ export async function POST(request: Request) {
       path: '/',
     })
     
+    console.log('[Auth/telegram] Session cookie set')
+    
     return NextResponse.json({
       success: true,
       user: {
         id: user.id,
-        telegramId: user.telegramId,
+        telegramId: user.telegramId.toString(),
         telegramUsername: user.telegramUsername,
         telegramFirstName: user.telegramFirstName,
       }
     })
   } catch (error) {
-    console.error('[Telegram Auth] Error:', error)
+    console.error('[Auth/telegram] Error:', error)
     return NextResponse.json(
       { error: 'Authentication failed' },
       { status: 500 }

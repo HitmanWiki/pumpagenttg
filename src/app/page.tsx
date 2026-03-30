@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import './globals.css'
 
-const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME 
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
 
 // ── Animated counter ──────────────────────────────────────────────────────────
 function Counter({ end, suffix = '', duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
@@ -106,6 +107,75 @@ const TgIcon = () => (
     <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.26 14.48l-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.194 1.006.131.893.077z"/>
   </svg>
 )
+
+// ── Telegram Login Component ──────────────────────────────────────────────────
+function TelegramLogin() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    // Check if already logged in
+    fetch('/api/auth/me')
+      .then(res => {
+        if (res.ok) {
+          router.push('/dashboard')
+        }
+      })
+      .catch(console.error)
+
+    // Setup Telegram login widget
+    const script = document.createElement('script')
+    script.src = 'https://telegram.org/js/telegram-widget.js?22'
+    script.async = true
+    script.setAttribute('data-telegram-login', BOT_USERNAME)
+    script.setAttribute('data-size', 'large')
+    script.setAttribute('data-auth-url', `${window.location.origin}/api/auth/telegram`)
+    script.setAttribute('data-request-access', 'write')
+    
+    const container = document.getElementById('telegram-login-widget')
+    if (container) {
+      container.innerHTML = ''
+      container.appendChild(script)
+    }
+
+    return () => {
+      if (container && script.parentNode) {
+        script.parentNode.removeChild(script)
+      }
+    }
+  }, [router])
+
+  // Global callback for Telegram login
+  if (typeof window !== 'undefined') {
+    window.onTelegramAuth = async (user: any) => {
+      setLoading(true)
+      try {
+        const response = await fetch('/api/auth/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(user)
+        })
+        
+        if (response.ok) {
+          router.push('/dashboard')
+        } else {
+          console.error('Login failed')
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Login error:', error)
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <div className="telegram-login-container">
+      <div id="telegram-login-widget" className="flex justify-center"></div>
+      {loading && <p className="mt-4 text-center text-gray-400">Logging in...</p>}
+    </div>
+  )
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function HomePage() {
@@ -297,20 +367,20 @@ export default function HomePage() {
           <FAQ />
         </div>
 
-        {/* CTA */}
+        {/* CTA - Login Section */}
         <div className="cta-section">
           <div className="cta-glow" />
           <div style={{ position: 'relative' }}>
             <div className="badge" style={{ marginBottom: '1.5rem' }}>
-              <span className="badge-dot" /> Ready to launch
+              <span className="badge-dot" /> Get Started
             </div>
-            <h2 className="cta-title">Your token is one<br />message away</h2>
-            <p className="cta-sub">Open Telegram. DM the bot. You're live in seconds.</p>
-            <div className="cta-btns">
-              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
-                <TgIcon /> Launch via Telegram
+            <h2 className="cta-title">Sign in to access<br />your dashboard</h2>
+            <p className="cta-sub">Login with Telegram to view your tokens, track earnings, and claim fees.</p>
+            <div className="cta-btns" style={{ flexDirection: 'column', gap: '1.5rem' }}>
+              <TelegramLogin />
+              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ marginTop: '0' }}>
+                <TgIcon /> Open Telegram Bot
               </a>
-              <Link href="/dashboard" className="btn-ghost">View Dashboard</Link>
             </div>
           </div>
         </div>
@@ -333,4 +403,11 @@ export default function HomePage() {
       </div>
     </>
   )
+}
+
+// Add TypeScript declaration for window.onTelegramAuth
+declare global {
+  interface Window {
+    onTelegramAuth: (user: any) => void
+  }
 }
