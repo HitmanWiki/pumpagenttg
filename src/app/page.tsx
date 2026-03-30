@@ -393,22 +393,24 @@ export default function HomePage() {
         </div>
 
         {/* CTA - Login Section */}
-        <div className="cta-section">
-          <div className="cta-glow" />
-          <div style={{ position: 'relative' }}>
-            <div className="badge" style={{ marginBottom: '1.5rem' }}>
-              <span className="badge-dot" /> Get Started
-            </div>
-            <h2 className="cta-title">Sign in to access<br />your dashboard</h2>
-            <p className="cta-sub">Login with Telegram to view your tokens, track earnings, and claim fees.</p>
-            <div className="cta-btns" style={{ flexDirection: 'column', gap: '1.5rem' }}>
-              <TelegramLogin />
-              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ marginTop: '0' }}>
-                <TgIcon /> Open Telegram Bot
-              </a>
-            </div>
-          </div>
-        </div>
+<div className="cta-section">
+  <div className="cta-glow" />
+  <div style={{ position: 'relative' }}>
+    <div className="badge" style={{ marginBottom: '1.5rem' }}>
+      <span className="badge-dot" /> Get Started
+    </div>
+    <h2 className="cta-title">Sign in to access<br />your dashboard</h2>
+    <p className="cta-sub">Login with Telegram to view your tokens, track earnings, and claim fees.</p>
+    <div className="cta-btns" style={{ flexDirection: 'column', gap: '1.5rem' }}>
+      <Link href="/login" className="btn-primary" style={{ display: 'inline-block', padding: '0.75rem 2rem' }}>
+        Login with Telegram
+      </Link>
+      <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ marginTop: '0' }}>
+        <TgIcon /> Open Telegram Bot
+      </a>
+    </div>
+  </div>
+</div>
 
         {/* Footer */}
         <div style={{ borderTop: '1px solid rgba(0,200,150,0.06)' }}>

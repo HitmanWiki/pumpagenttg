@@ -6,11 +6,13 @@ import prisma from '@/lib/prisma'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    console.log('[Auth/telegram] Received auth request for user:', body.id)
+    console.log('[Auth/telegram] Received auth for user:', body.id)
     
     // Verify Telegram auth data
-    if (!verifyTelegramAuth(body)) {
-      console.error('[Auth/telegram] Invalid Telegram auth')
+    const isValid = verifyTelegramAuth(body)
+    console.log('[Auth/telegram] Auth verification:', isValid)
+    
+    if (!isValid) {
       return NextResponse.json(
         { error: 'Invalid Telegram authentication' },
         { status: 401 }
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
       },
     })
     
-    console.log('[Auth/telegram] User found/created:', user.id)
+    console.log('[Auth/telegram] User ID:', user.id)
     
     // Create session token
     const sessionToken = await signSession({
@@ -44,8 +46,6 @@ export async function POST(request: Request) {
       telegramUsername: user.telegramUsername,
       telegramFirstName: user.telegramFirstName,
     })
-    
-    console.log('[Auth/telegram] Session token created')
     
     // Create response with cookie
     const response = NextResponse.json({
@@ -58,18 +58,19 @@ export async function POST(request: Request) {
       }
     })
     
-    // Set cookie directly on response
+    // Set cookie with explicit options
     response.cookies.set({
       name: 'pump_agent_session',
       value: sessionToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 30,
       path: '/',
+      domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
     })
     
-    console.log('[Auth/telegram] Cookie set on response')
+    console.log('[Auth/telegram] Cookie set')
     
     return response
   } catch (error) {

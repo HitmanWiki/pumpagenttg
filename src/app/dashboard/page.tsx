@@ -45,7 +45,16 @@ export default function DashboardPage() {
       setLoading(false)
     }
   }
-
+// src/app/dashboard/page.tsx - Add a debug check
+useEffect(() => {
+  // Test cookie endpoint first
+  fetch('/api/auth/test-cookie')
+    .then(res => res.json())
+    .then(data => console.log('[Dashboard] Cookie test:', data))
+    .catch(console.error)
+  
+  checkAuth()
+}, [])
   async function fetchAll() {
     setLoading(true)
     try {
