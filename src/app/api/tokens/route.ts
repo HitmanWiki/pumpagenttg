@@ -2,15 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-
-// Helper function to serialize BigInt
-function serializeBigInt<T>(obj: T): T {
-  return JSON.parse(
-    JSON.stringify(obj, (key, value) =>
-      typeof value === 'bigint' ? Number(value) : value
-    )
-  )
-}
+import { connection } from '@/lib/solana'
+import { PublicKey } from '@solana/web3.js'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -33,28 +26,57 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  // Calculate totals using BigInt with proper initialization
+  // Fetch real-time balances for all tokens
+  const tokensWithRealTimeData = await Promise.all(
+    tokens.map(async (token) => {
+      try {
+        // Fetch current balance from Solana
+        const balance = await connection.getBalance(
+          new PublicKey(token.tokenWalletAddress)
+        )
+        
+        // Update in background (don't await)
+        prisma.token.update({
+          where: { id: token.id },
+          data: {
+            claimableFeesLamports: BigInt(balance),
+          }
+        }).catch(console.error)
+        
+        // Return token with real-time data
+        return {
+          ...token,
+          claimableFeesLamports: balance,
+          claimableSol: balance / 1e9,
+        }
+      } catch (error) {
+        console.error(`Failed to fetch balance for token ${token.id}:`, error)
+        return token
+      }
+    })
+  )
+
+  // Calculate totals using real-time data
+  // Fix: Use BigInt(0) instead of 0n
   let totalEarnedLamports = BigInt(0)
   let claimableFeesLamports = BigInt(0)
   
-  for (const token of tokens) {
+  for (const token of tokensWithRealTimeData) {
     totalEarnedLamports = totalEarnedLamports + (token.totalFeesEarnedLamports as bigint)
-    claimableFeesLamports = claimableFeesLamports + (token.claimableFeesLamports as bigint)
+    claimableFeesLamports = claimableFeesLamports + BigInt(token.claimableFeesLamports || 0)
   }
 
-  const totalTokens = tokens.length
-  
-  // Convert to numbers (safe for SOL amounts since 1 SOL = 1e9, max ~9e18 fits in Number)
   const totalEarnedNumber = Number(totalEarnedLamports)
   const claimableNumber = Number(claimableFeesLamports)
 
-  // Serialize tokens to convert any BigInt fields
-  const serializedTokens = serializeBigInt(tokens)
-
   return NextResponse.json({
-    tokens: serializedTokens,
+    tokens: tokensWithRealTimeData.map(t => ({
+      ...t,
+      totalFeesEarnedLamports: Number(t.totalFeesEarnedLamports),
+      claimableFeesLamports: Number(t.claimableFeesLamports),
+    })),
     stats: {
-      totalTokens: totalTokens,
+      totalTokens: tokens.length,
       totalEarnedLamports: totalEarnedNumber,
       claimableFeesLamports: claimableNumber,
       totalEarnedSol: totalEarnedNumber / 1e9,

@@ -1,6 +1,8 @@
+// src/app/api/tokens/all/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { serializeBigInt } from '@/lib/utils'
+import { connection } from '@/lib/solana'
+import { PublicKey } from '@solana/web3.js'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -43,11 +45,43 @@ export async function GET(req: NextRequest) {
     prisma.token.count({ where }),
   ])
 
-  // Serialize BigInt values to numbers
-  const serializedTokens = serializeBigInt(tokens)
+  // Fetch real-time data for all tokens in parallel
+  const tokensWithRealTimeData = await Promise.all(
+    tokens.map(async (token) => {
+      try {
+        const [balance, marketCap] = await Promise.all([
+          connection.getBalance(new PublicKey(token.tokenWalletAddress)),
+          fetchMarketCapFromPumpFun(token.mintAddress)
+        ])
+        
+        // Update in background
+        prisma.token.update({
+          where: { id: token.id },
+          data: {
+            claimableFeesLamports: BigInt(balance),
+            marketCapUsd: marketCap,
+          }
+        }).catch(console.error)
+        
+        return {
+          ...token,
+          claimableFeesLamports: balance,
+          claimableSol: balance / 1e9,
+          marketCapUsd: marketCap,
+        }
+      } catch (error) {
+        console.error(`Failed to fetch data for token ${token.id}:`, error)
+        return token
+      }
+    })
+  )
 
   return NextResponse.json({
-    tokens: serializedTokens,
+    tokens: tokensWithRealTimeData.map(t => ({
+      ...t,
+      totalFeesEarnedLamports: Number(t.totalFeesEarnedLamports),
+      claimableFeesLamports: Number(t.claimableFeesLamports),
+    })),
     pagination: {
       page,
       limit,
@@ -55,4 +89,25 @@ export async function GET(req: NextRequest) {
       totalPages: Math.ceil(total / limit),
     }
   })
+}
+
+// Helper function to fetch market cap from pump.fun
+async function fetchMarketCapFromPumpFun(mintAddress: string): Promise<number> {
+  try {
+    const response = await fetch(`https://frontend-api.pump.fun/coins/${mintAddress}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json',
+      }
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      return data.marketCap || data.market_cap || 0
+    }
+    return 0
+  } catch (error) {
+    console.error('Failed to fetch market cap:', error)
+    return 0
+  }
 }
