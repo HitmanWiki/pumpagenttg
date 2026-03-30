@@ -1,3 +1,4 @@
+// src/app/api/auth/check-login/route.ts
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
@@ -31,17 +32,24 @@ export async function GET(request: Request) {
 
 // This endpoint will be called by your bot when user logs in
 export async function POST(request: Request) {
-  const body = await request.json()
-  const { loginId, token, user } = body
-  
-  if (loginId && token && user) {
-    loginSessions.set(loginId, {
-      token,
-      user,
-      expires: Date.now() + 60000 // 1 minute
-    })
-    return NextResponse.json({ success: true })
+  try {
+    const body = await request.json()
+    const { loginId, token, user } = body
+    
+    console.log('[CheckLogin] Received login confirmation:', { loginId, hasToken: !!token, user })
+    
+    if (loginId && token && user) {
+      loginSessions.set(loginId, {
+        token,
+        user,
+        expires: Date.now() + 60000 // 1 minute
+      })
+      return NextResponse.json({ success: true })
+    }
+    
+    return NextResponse.json({ error: 'Invalid data' }, { status: 400 })
+  } catch (error) {
+    console.error('[CheckLogin] Error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
-  
-  return NextResponse.json({ error: 'Invalid data' }, { status: 400 })
 }

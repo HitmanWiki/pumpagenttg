@@ -19,52 +19,53 @@ export default function LoginPage() {
     }
   }, [])
 
-  const handleLogin = async () => {
-    setLoading(true)
-    setError(null)
+  // src/app/login/page.tsx - Update the handleLogin function
+const handleLogin = async () => {
+  setLoading(true)
+  setError(null)
+  
+  try {
+    // Create a unique login ID
+    const loginId = Date.now().toString()
+    localStorage.setItem('pending_login', loginId)
     
-    try {
-      // Create a unique login ID
-      const loginId = Date.now().toString()
-      localStorage.setItem('pending_login', loginId)
-      
-      // Open Telegram bot with login command
-      const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
-      window.open(`https://t.me/${botUsername}?start=login_${loginId}`, '_blank')
-      
-      // Poll for login completion
-      const interval = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/auth/check-login?id=${loginId}`)
-          const data = await response.json()
-          
-          if (data.token) {
-            localStorage.setItem('auth_token', data.token)
-            localStorage.setItem('auth_user', JSON.stringify(data.user))
-            localStorage.removeItem('pending_login')
-            clearInterval(interval)
-            window.location.href = '/dashboard'
-          }
-        } catch (err) {
-          console.error('Poll error:', err)
+    // Open Telegram bot with login command
+    const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
+    window.open(`https://t.me/${botUsername}?start=login_${loginId}`, '_blank')
+    
+    // Poll for login completion
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/auth/check-login?id=${loginId}`)
+        const data = await response.json()
+        
+        if (data.token) {
+          localStorage.setItem('auth_token', data.token)
+          localStorage.setItem('auth_user', JSON.stringify(data.user))
+          localStorage.removeItem('pending_login')
+          clearInterval(interval)
+          window.location.href = '/dashboard'
         }
-      }, 2000)
-      
-      // Timeout after 60 seconds
-      setTimeout(() => {
-        clearInterval(interval)
-        if (localStorage.getItem('pending_login')) {
-          setError('Login timed out. Please try again.')
-          setLoading(false)
-        }
-      }, 60000)
-      
-    } catch (error) {
-      console.error('Login error:', error)
-      setError('Failed to open Telegram. Please try again.')
-      setLoading(false)
-    }
+      } catch (err) {
+        console.error('Poll error:', err)
+      }
+    }, 2000)
+    
+    // Timeout after 60 seconds
+    setTimeout(() => {
+      clearInterval(interval)
+      if (localStorage.getItem('pending_login')) {
+        setError('Login timed out. Please try again.')
+        setLoading(false)
+      }
+    }, 60000)
+    
+  } catch (error) {
+    console.error('Login error:', error)
+    setError('Failed to open Telegram. Please try again.')
+    setLoading(false)
   }
+}
 
   // Create a simple login with Telegram button
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'

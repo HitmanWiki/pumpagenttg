@@ -111,8 +111,14 @@ bot.command('start', async (ctx) => {
         telegramFirstName: user.telegramFirstName,
       })
       
+      // Build the full URL with protocol
+      const webhookUrl = appUrl.startsWith('http') ? appUrl : `https://${appUrl}`
+      const loginUrl = `${webhookUrl}/api/auth/check-login`
+      
+      console.log('[Bot] Sending login confirmation to:', loginUrl)
+      
       // Send login confirmation to web app
-      const response = await fetch(`${appUrl}/api/auth/check-login`, {
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -136,6 +142,8 @@ bot.command('start', async (ctx) => {
         )
         console.log('[Bot] Login successful for user:', telegramUser.username)
       } else {
+        const errorText = await response.text()
+        console.error('[Bot] Login confirmation failed:', response.status, errorText)
         await ctx.reply(
           `❌ *Login failed*\n\n` +
           `Something went wrong. Please try again from the website.`,
