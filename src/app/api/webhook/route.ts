@@ -1,4 +1,6 @@
 // src/app/api/webhook/route.ts
+export const runtime = 'nodejs'  // Add this line at the very top
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getBot } from '@/lib/bot'
 

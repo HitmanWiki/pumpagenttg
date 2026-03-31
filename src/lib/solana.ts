@@ -1,8 +1,11 @@
 // src/lib/solana.ts
 import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
-import { AnchorProvider, Wallet } from '@coral-xyz/anchor'
-import { PumpFunSDK } from 'pumpdotfun-sdk-v3.0'
+import { AnchorProvider } from '@coral-xyz/anchor'
+import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet'
+import { PumpFunSDK } from 'pumpdotfun-sdk'
 import bs58 from 'bs58'
+import fs from 'fs'
+import path from 'path'
 
 export const connection = new Connection(
   process.env.SOLANA_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com',
@@ -46,7 +49,6 @@ export async function getSolBalance(publicKey: string): Promise<number> {
 
 // Helper function to convert Buffer to Blob (fixed)
 function bufferToBlob(buffer: Buffer, mimeType: string): Blob {
-  // Convert Buffer to Uint8Array first, which is a valid BlobPart
   const uint8Array = new Uint8Array(buffer)
   return new Blob([uint8Array], { type: mimeType })
 }
@@ -105,8 +107,14 @@ async function getImageUrlFromMetadata(metadataUri: string): Promise<string | nu
   }
 }
 
+// Helper to convert Buffer to File (for SDK)
+function bufferToFile(buffer: Buffer, filename: string): File {
+  const uint8Array = new Uint8Array(buffer)
+  return new File([uint8Array], filename, { type: 'image/png' })
+}
+
 // ============================================================
-// PumpPortal Token Deployment with Official SDK
+// Token Deployment with pumpdotfun-sdk
 // ============================================================
 
 export interface DeployTokenParams {
@@ -149,44 +157,45 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     const imageUrl = await getImageUrlFromMetadata(metadataUri)
     console.log('[deployToken] Image URL:', imageUrl)
 
-    // Step 3: Setup SDK with platform wallet
-    const platformKeypair = getPlatformKeypair()
-    const wallet = new Wallet(platformKeypair)
-    const provider = new AnchorProvider(connection, wallet, { 
+    // Step 3: Setup SDK
+    const deployerKeypair = getPlatformKeypair()
+    const wallet = new NodeWallet(deployerKeypair)
+    const provider = new AnchorProvider(connection, wallet, {
       commitment: 'confirmed',
       preflightCommitment: 'confirmed'
     })
     
     const sdk = new PumpFunSDK(provider)
 
-    // Step 4: Create token metadata - Fix: Convert Buffer to Blob properly
-    const imageBlob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' })
+    // Step 4: Create File object from buffer (SDK expects File, not filePath)
+    const imageFile = bufferToFile(imageBuffer, imageFileName)
+    
     const tokenMetadata = {
       name: name,
       symbol: symbol,
       description: description || '',
-      file: imageBlob,
+      file: imageFile,  // Use File object, not filePath
+      twitter: '',
+      telegram: telegram || '',
+      website: website || '',
     }
 
     console.log('[deployToken] Creating token with SDK...')
     
     // Step 5: Create and optionally buy token
-    // Use BigInt() instead of 0n literal for ES2020 compatibility
-    const buyAmount = devBuySol > 0 ? BigInt(Math.floor(devBuySol * LAMPORTS_PER_SOL)) : BigInt(0)
-    
     const result = await sdk.createAndBuy(
-      platformKeypair,           // creator
-      mintKeypair,               // mint keypair
+      deployerKeypair,           // signer
+      mintKeypair,               // new token mint
       tokenMetadata,             // token metadata
-      buyAmount,                 // buy amount in lamports (BigInt)
-      BigInt(500),               // 5% slippage (BigInt)
+      BigInt(Math.floor(devBuySol * LAMPORTS_PER_SOL)), // dev buy amount in lamports
+      BigInt(500),               // 5% slippage
       { 
         unitLimit: 250000, 
-        unitPrice: 100000        // 0.0001 SOL priority fee
+        unitPrice: 250000        // priority fee
       }
     )
 
-    console.log('[deployToken] Deployment result:', result)
+    console.log('[deployToken] SDK Result:', result)
 
     if (!result || !result.signature) {
       throw new Error('SDK returned no transaction signature')
