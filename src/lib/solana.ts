@@ -1,5 +1,7 @@
 // src/lib/solana.ts
 import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor'
+import { PumpFunSDK } from 'pumpdotfun-sdk-v3.0'
 import bs58 from 'bs58'
 
 export const connection = new Connection(
@@ -42,15 +44,69 @@ export async function getSolBalance(publicKey: string): Promise<number> {
   }
 }
 
-// Helper function to convert Buffer to Blob
+// Helper function to convert Buffer to Blob (fixed)
 function bufferToBlob(buffer: Buffer, mimeType: string): Blob {
   // Convert Buffer to Uint8Array first, which is a valid BlobPart
   const uint8Array = new Uint8Array(buffer)
   return new Blob([uint8Array], { type: mimeType })
 }
 
+// Helper to upload image to IPFS via pump.fun
+async function uploadToIPFS(
+  name: string,
+  symbol: string,
+  description: string,
+  website: string,
+  telegram: string,
+  imageBuffer: Buffer,
+  imageFileName: string
+): Promise<string> {
+  const formData = new FormData()
+  const imageBlob = bufferToBlob(imageBuffer, 'image/png')
+  formData.append('file', imageBlob, imageFileName)
+  formData.append('name', name)
+  formData.append('symbol', symbol)
+  formData.append('description', description)
+  if (telegram) formData.append('telegram', telegram)
+  if (website) formData.append('website', website)
+  formData.append('showName', 'true')
+
+  console.log('[deployToken] Uploading to IPFS...')
+  const ipfsResponse = await fetch('https://pump.fun/api/ipfs', {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!ipfsResponse.ok) {
+    const errorText = await ipfsResponse.text()
+    throw new Error(`IPFS upload failed: ${ipfsResponse.statusText} - ${errorText}`)
+  }
+
+  const ipfsData = await ipfsResponse.json()
+  const metadataUri = ipfsData.metadataUri || ipfsData.uri
+  
+  if (!metadataUri) {
+    throw new Error('No metadata URI returned from IPFS')
+  }
+
+  console.log('[deployToken] Metadata URI:', metadataUri)
+  return metadataUri
+}
+
+// Helper to get image URL from metadata
+async function getImageUrlFromMetadata(metadataUri: string): Promise<string | null> {
+  try {
+    const metadataResponse = await fetch(metadataUri)
+    const metadata = await metadataResponse.json()
+    return metadata.image || null
+  } catch (err) {
+    console.error('[deployToken] Failed to fetch metadata:', err)
+    return metadataUri.replace('/metadata.json', '/image.png')
+  }
+}
+
 // ============================================================
-// PumpPortal Token Deployment
+// PumpPortal Token Deployment with Official SDK
 // ============================================================
 
 export interface DeployTokenParams {
@@ -74,8 +130,6 @@ export interface DeployTokenResult {
   error?: string
 }
 
-// src/lib/solana.ts - Update the deployToken function
-
 export async function deployToken(params: DeployTokenParams): Promise<DeployTokenResult> {
   const {
     name, symbol, description, website, telegram,
@@ -85,112 +139,71 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
   try {
     console.log('[deployToken] Starting deployment for:', name, symbol)
     
-    // Step 1: Upload metadata + image to IPFS via pump.fun
-    const formData = new FormData()
-    const imageBlob = bufferToBlob(imageBuffer, 'image/png')
-    formData.append('file', imageBlob, imageFileName)
-    formData.append('name', name)
-    formData.append('symbol', symbol)
-    formData.append('description', description || '')
-    if (telegram) formData.append('telegram', telegram)
-    if (website) formData.append('website', website)
-    formData.append('showName', 'true')
+    // Step 1: Upload metadata to IPFS
+    const metadataUri = await uploadToIPFS(
+      name, symbol, description || '', website || '', telegram || '',
+      imageBuffer, imageFileName
+    )
 
-    console.log('[deployToken] Uploading to IPFS...')
-    const ipfsResponse = await fetch('https://pump.fun/api/ipfs', {
-      method: 'POST',
-      body: formData,
+    // Step 2: Get the actual image URL from metadata
+    const imageUrl = await getImageUrlFromMetadata(metadataUri)
+    console.log('[deployToken] Image URL:', imageUrl)
+
+    // Step 3: Setup SDK with platform wallet
+    const platformKeypair = getPlatformKeypair()
+    const wallet = new Wallet(platformKeypair)
+    const provider = new AnchorProvider(connection, wallet, { 
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed'
     })
-
-    if (!ipfsResponse.ok) {
-      const errorText = await ipfsResponse.text()
-      console.error('[deployToken] IPFS upload failed:', errorText)
-      throw new Error(`IPFS upload failed: ${ipfsResponse.statusText} - ${errorText}`)
-    }
-
-    const ipfsData = await ipfsResponse.json()
-    const metadataUri = ipfsData.metadataUri || ipfsData.uri
-
-    if (!metadataUri) {
-      console.error('[deployToken] No metadata URI in response:', ipfsData)
-      throw new Error('No metadata URI returned from IPFS')
-    }
-
-    console.log('[deployToken] Metadata URI:', metadataUri)
-
-    // Fetch the metadata to get the actual image URL
-    let imageUrl = null
-    try {
-      const metadataResponse = await fetch(metadataUri)
-      const metadata = await metadataResponse.json()
-      imageUrl = metadata.image
-      console.log('[deployToken] Extracted image URL from metadata:', imageUrl)
-    } catch (err) {
-      console.error('[deployToken] Failed to fetch metadata, using fallback:', err)
-      // Fallback: construct image URL from metadata URI
-      imageUrl = metadataUri.replace('/metadata.json', '/image.png')
-    }
-
-    // Step 2: Deploy via PumpPortal API
-    const mintSecretKey = bs58.encode(mintKeypair.secretKey)
-    const apiKey = process.env.PUMPPORTAL_API_KEY
     
-    console.log('[deployToken] API Key exists:', !!apiKey)
-    console.log('[deployToken] Mint public key:', mintKeypair.publicKey.toBase58())
-    
-    const deployPayload = {
-      action: 'create',
-      tokenMetadata: {
-        name: name,
-        symbol: symbol,
-        uri: metadataUri,
-      },
-      mint: mintSecretKey,
-      denominatedInSol: 'true',
-      amount: devBuySol.toString(),
-      slippage: 10,
-      priorityFee: 0.00001,
-      pool: 'pump',
+    const sdk = new PumpFunSDK(provider)
+
+    // Step 4: Create token metadata - Fix: Convert Buffer to Blob properly
+    const imageBlob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' })
+    const tokenMetadata = {
+      name: name,
+      symbol: symbol,
+      description: description || '',
+      file: imageBlob,
     }
 
-    console.log('[deployToken] Deploying with payload...')
+    console.log('[deployToken] Creating token with SDK...')
     
-    const deployResponse = await fetch(`https://pumpportal.fun/api/trade?api-key=${apiKey}`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(deployPayload),
-    })
-
-    if (!deployResponse.ok) {
-      const errText = await deployResponse.text()
-      console.error('[deployToken] PumpPortal deploy failed:', errText)
-      throw new Error(`PumpPortal deploy failed: ${deployResponse.status} - ${errText}`)
-    }
-
-    const deployData = await deployResponse.json()
-    console.log('[deployToken] Deploy response:', deployData)
-
-    const txSignature = deployData.signature
+    // Step 5: Create and optionally buy token
+    // Use BigInt() instead of 0n literal for ES2020 compatibility
+    const buyAmount = devBuySol > 0 ? BigInt(Math.floor(devBuySol * LAMPORTS_PER_SOL)) : BigInt(0)
     
-    if (!txSignature) {
-      console.warn('[deployToken] No transaction signature in response')
+    const result = await sdk.createAndBuy(
+      platformKeypair,           // creator
+      mintKeypair,               // mint keypair
+      tokenMetadata,             // token metadata
+      buyAmount,                 // buy amount in lamports (BigInt)
+      BigInt(500),               // 5% slippage (BigInt)
+      { 
+        unitLimit: 250000, 
+        unitPrice: 100000        // 0.0001 SOL priority fee
+      }
+    )
+
+    console.log('[deployToken] Deployment result:', result)
+
+    if (!result || !result.signature) {
+      throw new Error('SDK returned no transaction signature')
     }
 
     const mintAddress = mintKeypair.publicKey.toBase58()
     const pumpFunUrl = `https://pump.fun/coin/${mintAddress}`
 
     console.log('[deployToken] Success! Token at:', pumpFunUrl)
-    console.log('[deployToken] Transaction:', `https://solscan.io/tx/${txSignature}`)
-    console.log('[deployToken] Final Image URL being saved:', imageUrl)
+    console.log('[deployToken] Transaction:', `https://solscan.io/tx/${result.signature}`)
 
     return {
       success: true,
       mintAddress,
-      txSignature,
+      txSignature: result.signature,
       pumpFunUrl,
-      imageUrl,  // This will be the actual image URL like https://ipfs.io/ipfs/QmaMVzeEtmRkzJKYeE5rDrnv73EzB5nCyKDhKJT6rGnhXt
+      imageUrl: imageUrl || undefined,
     }
   } catch (error: any) {
     console.error('[deployToken] Error:', error)
