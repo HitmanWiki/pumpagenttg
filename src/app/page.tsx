@@ -264,7 +264,7 @@ export default function HomePage() {
 
         {/* Features */}
         <div className="section" style={{ paddingTop: 0 }}>
-          <div className="section-label">// Why Pump Agent</div>
+          <div className="section-label">// Why PUMPA TG</div>
           <h2 className="section-title">Everything you need,<br />nothing you don't</h2>
           <div className="feature-grid">
             {[
@@ -377,7 +377,7 @@ export default function HomePage() {
         PA
       </div>
       <div className="footer-copy">
-        © {new Date().getFullYear()} Pump Agent · Built on Solana · Non-custodial · No KYC
+        © {new Date().getFullYear()} Pump Agent TG· Built on Solana · Non-custodial · No KYC
       </div>
     </div>
     <div className="footer-links">

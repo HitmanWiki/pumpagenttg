@@ -1,6 +1,6 @@
 {
-  "name": "Pump Agent",
-  "short_name": "PumpAgent",
+  "name": "Pump Agent TG",
+  "short_name": "PUMPATG",
   "description": "Launch tokens on pump.fun directly from Telegram",
   "start_url": "/",
   "display": "standalone",

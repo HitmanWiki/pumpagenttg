@@ -45,7 +45,7 @@ export default function Nav() {
             height={36}
             style={{ borderRadius: '8px' }}
           />
-          <span style={{ fontSize: '1.125rem', fontWeight: 700, color: '#e2ece6' }}>Pump Agent</span>
+          <span style={{ fontSize: '1.125rem', fontWeight: 700, color: '#e2ece6' }}>Pump Agent TG</span>
         </Link>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>

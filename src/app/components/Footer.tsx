@@ -23,7 +23,7 @@ export default function Footer() {
             PA
           </div>
           <div className="footer-copy">
-            © {new Date().getFullYear()} Pump Agent · Built on Solana · Non-custodial · No KYC
+            © {new Date().getFullYear()} Pump Agent TG · Built on Solana · Non-custodial · No KYC
           </div>
         </div>
         <div className="footer-links">
