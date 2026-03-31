@@ -114,61 +114,63 @@ export default function LeaderboardPage() {
             ) : tokens.map((t: any, i: number) => {
               const rank = (page - 1) * 10 + i + 1
               const pct = campaign ? Math.min(100, (t.marketCapUsd / campaign.goalValue) * 100) : 0
-              const imageUrl = t.imageUrl || `https://img.pump.fun/icon/${t.mintAddress}`
+              const imageUrl = t.imageUrl || (t.metadataUri ? `https://ipfs.io/ipfs/${t.metadataUri.split('/ipfs/')[1]?.split('/')[0]}/image.png` : null)
 
               return (
-                <div key={t.id} className="data-row">
-                  <div style={{ width: 32, textAlign: 'center', flexShrink: 0 }}>
-                    {rank <= 3 ? <span style={{ fontSize: '1.1rem' }}>{MEDALS[rank - 1]}</span>
-                      : <span className="mono text-dimmer" style={{ fontSize: '0.8125rem' }}>{rank}</span>}
-                  </div>
-                  <div className="token-avatar" style={{ width: '40px', height: '40px' }}>
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt={t.name}
-                        onError={(e) => {
-                          const img = e.target as HTMLImageElement
-                          img.style.display = 'none'
-                          const parent = img.parentElement
-                          if (parent) {
-                            parent.innerHTML = t.symbol?.slice(0, 2).toUpperCase() || '??'
-                            parent.style.display = 'flex'
-                            parent.style.alignItems = 'center'
-                            parent.style.justifyContent = 'center'
-                            parent.style.fontSize = '0.875rem'
-                            parent.style.fontWeight = 'bold'
-                            parent.style.color = '#00C896'
-                          }
-                        }}
-                      />
-                    ) : (
-                      <span style={{ fontSize: '0.875rem', fontWeight: 'bold', color: '#00C896' }}>
-                        {t.symbol?.slice(0, 2).toUpperCase() || '??'}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.9rem', letterSpacing: '-0.2px' }}>{t.name}</span>
-                      <span className="text-green mono" style={{ fontSize: '0.75rem' }}>{'$' + t.symbol}</span>
+                <Link key={t.id} href={`/token/${t.id}`} style={{ textDecoration: 'none' }}>
+                  <div className="data-row" style={{ cursor: 'pointer' }}>
+                    <div style={{ width: 32, textAlign: 'center', flexShrink: 0 }}>
+                      {rank <= 3 ? <span style={{ fontSize: '1.1rem' }}>{MEDALS[rank - 1]}</span>
+                        : <span className="mono text-dimmer" style={{ fontSize: '0.8125rem' }}>{rank}</span>}
                     </div>
-                    <div className="mono text-dimmer" style={{ fontSize: '0.72rem' }}>by @{t.user?.telegramUsername || 'unknown'}</div>
-                  </div>
-                  {campaign && (
-                    <div style={{ width: 160, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div className="progress-track" style={{ flex: 1 }}>
-                        <div className="progress-fill" style={{ width: `${pct}%` }} />
+                    <div className="token-avatar" style={{ width: '40px', height: '40px' }}>
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={t.name}
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement
+                            img.style.display = 'none'
+                            const parent = img.parentElement
+                            if (parent) {
+                              parent.innerHTML = t.symbol?.slice(0, 2).toUpperCase() || '??'
+                              parent.style.display = 'flex'
+                              parent.style.alignItems = 'center'
+                              parent.style.justifyContent = 'center'
+                              parent.style.fontSize = '0.875rem'
+                              parent.style.fontWeight = 'bold'
+                              parent.style.color = '#00C896'
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '0.875rem', fontWeight: 'bold', color: '#00C896' }}>
+                          {t.symbol?.slice(0, 2).toUpperCase() || '??'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem', letterSpacing: '-0.2px' }}>{t.name}</span>
+                        <span className="text-green mono" style={{ fontSize: '0.75rem' }}>{'$' + t.symbol}</span>
                       </div>
-                      <span className="mono text-muted" style={{ fontSize: '0.72rem', whiteSpace: 'nowrap' }}>{pct.toFixed(0)}% to goal</span>
+                      <div className="mono text-dimmer" style={{ fontSize: '0.72rem' }}>by @{t.user?.telegramUsername || 'unknown'}</div>
                     </div>
-                  )}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 700, color: t.marketCapUsd > 0 ? '#00C896' : '#3a4e42', fontSize: '0.9375rem' }}>{formatMC(t.marketCapUsd)}</div>
-                    {t.pumpFunUrl && <a href={t.pumpFunUrl} target="_blank" rel="noopener noreferrer" className="mono text-dimmer" style={{ fontSize: '0.72rem', textDecoration: 'none', transition: 'color 0.2s' }}
-                      onMouseEnter={e => (e.currentTarget.style.color = '#00C896')} onMouseLeave={e => (e.currentTarget.style.color = '')}>pump.fun ↗</a>}
+                    {campaign && (
+                      <div style={{ width: 160, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="progress-track" style={{ flex: 1 }}>
+                          <div className="progress-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="mono text-muted" style={{ fontSize: '0.72rem', whiteSpace: 'nowrap' }}>{pct.toFixed(0)}% to goal</span>
+                      </div>
+                    )}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontWeight: 700, color: t.marketCapUsd > 0 ? '#00C896' : '#3a4e42', fontSize: '0.9375rem' }}>{formatMC(t.marketCapUsd)}</div>
+                      {t.pumpFunUrl && <a href={t.pumpFunUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="mono text-dimmer" style={{ fontSize: '0.72rem', textDecoration: 'none', transition: 'color 0.2s' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#00C896')} onMouseLeave={e => (e.currentTarget.style.color = '')}>pump.fun ↗</a>}
+                    </div>
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>

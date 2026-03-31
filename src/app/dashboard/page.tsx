@@ -314,15 +314,14 @@ export default function DashboardPage() {
   )
 }
 
+// In your dashboard/page.tsx - Update TokenCard function
 function TokenCard({ token, onCopy, copied }: { token:any; onCopy:(t:string,k:string)=>void; copied:string }) {
   const feeSol = (Number(token.claimableFeesLamports)/1e9).toFixed(4)
   const date   = new Date(token.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
   
-  // Try multiple image URL sources
+  // Get image URL - prioritize saved imageUrl, then construct from IPFS
   const imageUrl = token.imageUrl || 
-                   `https://img.pump.fun/icon/${token.mintAddress}` ||
-                   `https://pump.fun/icon/${token.mintAddress}` ||
-                   `https://ipfs.io/ipfs/${token.metadataHash}/image.png`
+                   (token.metadataUri ? `https://ipfs.io/ipfs/${token.metadataUri.split('/ipfs/')[1]?.split('/')[0]}/image.png` : null)
   
   return (
     <Link href={`/token/${token.id}`} style={{ textDecoration: 'none', display: 'block' }}>
@@ -338,24 +337,23 @@ function TokenCard({ token, onCopy, copied }: { token:any; onCopy:(t:string,k:st
                 src={imageUrl} 
                 alt={token.name}
                 onError={(e) => {
-                  // Fallback if image fails to load
                   const img = e.target as HTMLImageElement
                   img.style.display = 'none'
                   const parent = img.parentElement
                   if (parent) {
-                    parent.innerHTML = token.symbol.slice(0,2).toUpperCase()
+                    parent.innerHTML = token.symbol?.slice(0,2).toUpperCase() || '??'
                     parent.style.display = 'flex'
                     parent.style.alignItems = 'center'
                     parent.style.justifyContent = 'center'
-                    parent.style.fontSize = '1.25rem'
+                    parent.style.fontSize = '1rem'
                     parent.style.fontWeight = 'bold'
                     parent.style.color = '#00C896'
                   }
                 }}
               />
             ) : (
-              <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#00C896' }}>
-                {token.symbol.slice(0,2).toUpperCase()}
+              <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#00C896' }}>
+                {token.symbol?.slice(0,2).toUpperCase() || '??'}
               </span>
             )}
           </div>
@@ -369,7 +367,7 @@ function TokenCard({ token, onCopy, copied }: { token:any; onCopy:(t:string,k:st
           <span style={{ fontFamily: 'DM Mono,monospace', fontWeight: 600 }}>{feeSol} <span className="text-muted" style={{ fontSize: '0.75rem' }}>SOL</span></span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }} className="mono text-dimmer">
-          <span>🔗 {shortAddr(token.mintAddress)}</span>
+          <span>🔗 {token.mintAddress ? `${token.mintAddress.slice(0,8)}...${token.mintAddress.slice(-4)}pump` : ''}</span>
           {token.pumpFunUrl && (
             <a 
               href={token.pumpFunUrl} 

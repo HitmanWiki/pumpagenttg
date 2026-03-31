@@ -141,7 +141,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
       denominatedInSol: 'true',
       amount: devBuySol.toString(),
       slippage: 10,
-      priorityFee: 0.0005,
+      priorityFee: 0.00001,
       pool: 'pump',
     }
 

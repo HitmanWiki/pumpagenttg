@@ -116,10 +116,11 @@ export default function TokensPage() {
   )
 }
 
+// Update the TokenCard function in tokens/page.tsx
 function TokenCard({ token }: { token: any }) {
-  // Get image URL from token
-  const imageUrl = token.imageUrl || `https://img.pump.fun/icon/${token.mintAddress}`
-
+  const imageUrl = token.imageUrl || 
+                   (token.metadataUri ? `https://ipfs.io/ipfs/${token.metadataUri.split('/ipfs/')[1]?.split('/')[0]}/image.png` : null)
+  
   return (
     <Link href={`/token/${token.id}`} style={{ textDecoration: 'none', display: 'block' }}>
       <div className="card card-inner token-card" style={{ cursor: 'pointer' }}>

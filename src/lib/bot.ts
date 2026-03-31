@@ -1,5 +1,5 @@
 // src/lib/bot.ts
-import { Bot, Context, InputFile } from 'grammy'
+import { Bot, Context } from 'grammy'
 import { Keypair } from '@solana/web3.js'
 import { deployToken, generateTokenWallet } from './solana'
 import { signSession } from './auth'
@@ -41,7 +41,6 @@ initializeBot().catch(console.error)
 
 // Middleware to ensure bot is initialized before processing
 bot.use(async (ctx, next) => {
-  // Wait for initialization to complete
   await initializeBot()
   await next()
 })
@@ -85,7 +84,6 @@ bot.command('start', async (ctx) => {
     }
     
     try {
-      // Find or create user
       const user = await prisma.user.upsert({
         where: { telegramId: BigInt(telegramUser.id) },
         update: {
@@ -103,7 +101,6 @@ bot.command('start', async (ctx) => {
       
       console.log('[Bot] User found/created:', user.id)
       
-      // Create session token
       const sessionToken = await signSession({
         id: user.id,
         telegramId: user.telegramId,
@@ -111,13 +108,11 @@ bot.command('start', async (ctx) => {
         telegramFirstName: user.telegramFirstName,
       })
       
-      // Build the full URL with protocol
       const webhookUrl = appUrl.startsWith('http') ? appUrl : `https://${appUrl}`
       const loginUrl = `${webhookUrl}/api/auth/check-login`
       
       console.log('[Bot] Sending login confirmation to:', loginUrl)
       
-      // Send login confirmation to web app
       const response = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -324,7 +319,7 @@ bot.on('message:photo', async (ctx) => {
 
   if (!caption.toLowerCase().startsWith('/launch')) {
     console.log('[Bot] Photo without /launch, ignoring')
-    return // ignore photos without /launch
+    return
   }
 
   console.log('[Bot] Launching token from photo with caption:', caption)
@@ -337,7 +332,6 @@ bot.on('message:photo', async (ctx) => {
 bot.command('launch', async (ctx) => {
   console.log('[Bot] /launch command from:', ctx.from?.username)
   
-  // If this is a reply to a photo message, use that photo
   const replyPhoto = ctx.message?.reply_to_message?.photo
   if (replyPhoto) {
     const caption = ctx.message?.text || ''
@@ -365,11 +359,9 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
 
   console.log('[Launch] Starting launch process for user:', telegramUser.username)
 
-  // Parse the caption
   const lines = caption.split('\n').map(l => l.trim())
   const firstLine = lines[0]
 
-  // Extract name and ticker from first line: "/launch My Token $MTK"
   const launchMatch = firstLine.match(/^\/launch\s+(.+?)\s+\$([A-Za-z]+)$/i)
   if (!launchMatch) {
     return ctx.reply(
@@ -383,7 +375,6 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
   const tokenName = launchMatch[1].trim()
   const tokenSymbol = launchMatch[2].toUpperCase()
 
-  // Validate
   if (tokenName.length < 2 || tokenName.length > 32) {
     return ctx.reply(`❌ Token name must be 2–32 characters. Got: ${tokenName.length}`)
   }
@@ -391,7 +382,6 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     return ctx.reply(`❌ Ticker must be 2–10 letters. Got: $${tokenSymbol}`)
   }
 
-  // Parse optional description and website
   let description = ''
   let website = ''
   for (const line of lines.slice(1)) {
@@ -405,7 +395,6 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
 
   console.log('[Launch] Token details:', { tokenName, tokenSymbol, description, website })
 
-  // Get photo
   const photos = photoOverride || ctx.message?.photo
   if (!photos || photos.length === 0) {
     return ctx.reply(
@@ -414,14 +403,12 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     )
   }
 
-  // Send initial "processing" message
   const statusMsg = await ctx.reply(
     `⏳ *Launching ${tokenName} ($${tokenSymbol})...*\n\nUploading to IPFS...`,
     { parse_mode: 'Markdown' }
   )
 
   try {
-    // Download the largest photo
     const photo = photos[photos.length - 1]
     const file = await ctx.api.getFile(photo.file_id)
     const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
@@ -430,7 +417,6 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     const imageRes = await fetch(fileUrl)
     const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
 
-    // Upsert user in DB
     const user = await prisma.user.upsert({
       where: { telegramId: BigInt(telegramUser.id) },
       update: {
@@ -446,14 +432,11 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       },
     })
 
-    // Generate token keypair (this IS the token's mint address)
     const mintKeypair = Keypair.generate()
-    // Generate a separate wallet for fee accumulation
     const feeWallet = generateTokenWallet()
 
     console.log('[Launch] Mint address:', mintKeypair.publicKey.toBase58())
 
-    // Update status message
     await ctx.api.editMessageText(
       ctx.chat!.id,
       statusMsg.message_id,
@@ -461,63 +444,63 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       { parse_mode: 'Markdown' }
     )
 
-    // Deploy the token
     console.log('[Launch] Calling deployToken...')
-    // src/lib/bot.ts - In the handleLaunch function, update the token creation
-const deployResult = await deployToken({
-  name: tokenName,
-  symbol: tokenSymbol,
-  description,
-  website,
-  telegram: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}`,
-  imageBuffer,
-  imageFileName: `${tokenSymbol.toLowerCase()}.png`,
-  mintKeypair,
-  devBuySol: 0,
-})
+    const deployResult = await deployToken({
+      name: tokenName,
+      symbol: tokenSymbol,
+      description,
+      website,
+      telegram: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}`,
+      imageBuffer,
+      imageFileName: `${tokenSymbol.toLowerCase()}.png`,
+      mintKeypair,
+      devBuySol: 0,
+    })
 
-if (!deployResult.success) {
-  console.error('[Launch] Deployment failed:', deployResult.error)
-  await ctx.api.editMessageText(
-    ctx.chat!.id,
-    statusMsg.message_id,
-    `❌ *Launch failed*\n\n${deployResult.error || 'Unknown error. Please try again.'}`,
-    { parse_mode: 'Markdown' }
-  )
-  return
-}
+    if (!deployResult.success) {
+      console.error('[Launch] Deployment failed:', deployResult.error)
+      await ctx.api.editMessageText(
+        ctx.chat!.id,
+        statusMsg.message_id,
+        `❌ *Launch failed*\n\n${deployResult.error || 'Unknown error. Please try again.'}`,
+        { parse_mode: 'Markdown' }
+      )
+      return
+    }
 
-console.log('[Launch] Deployment successful! Pump.fun URL:', deployResult.pumpFunUrl)
-console.log('[Launch] Image URL:', deployResult.imageUrl)
+    console.log('[Launch] Deployment successful! Pump.fun URL:', deployResult.pumpFunUrl)
+    console.log('[Launch] Image URL:', deployResult.imageUrl)
 
-// Save token to DB with image URL
-await prisma.token.create({
-  data: {
-    userId: user.id,
-    name: tokenName,
-    symbol: tokenSymbol,
-    description: description || null,
-    website: website || null,
-    imageUrl: deployResult.imageUrl || null, // Save the image URL
-    mintAddress: deployResult.mintAddress,
-    tokenWalletAddress: feeWallet.publicKey,
-    tokenWalletPrivKey: feeWallet.privateKey,
-    deployTx: deployResult.txSignature || null,
-    pumpFunUrl: deployResult.pumpFunUrl || null,
-    status: 'LIVE',
-    telegramChatId: BigInt(ctx.chat!.id),
-    telegramMessageId: BigInt(statusMsg.message_id),
-  }
-})
+    // Extract image URL from metadata or use the one from deploy result
+    const imageUrl = deployResult.imageUrl
+
+    await prisma.token.create({
+      data: {
+        userId: user.id,
+        name: tokenName,
+        symbol: tokenSymbol,
+        description: description || null,
+        website: website || null,
+        imageUrl: imageUrl,
+        mintAddress: deployResult.mintAddress,
+        tokenWalletAddress: feeWallet.publicKey,
+        tokenWalletPrivKey: feeWallet.privateKey,
+        deployTx: deployResult.txSignature || null,
+        pumpFunUrl: deployResult.pumpFunUrl || null,
+        status: 'LIVE',
+        telegramChatId: BigInt(ctx.chat!.id),
+        telegramMessageId: BigInt(statusMsg.message_id),
+      }
+    })
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
 
-    // Success message
     await ctx.api.editMessageText(
       ctx.chat!.id,
       statusMsg.message_id,
       `✅ *${tokenName} ($${tokenSymbol}) is LIVE on pump.fun!*\n\n` +
       `🔗 [View on pump.fun](${deployResult.pumpFunUrl})\n` +
-      `📋 CA: \`${deployResult.mintAddress}\`\n\n` +
+      `📋 CA: \`${deployResult.mintAddress.slice(0, 8)}...${deployResult.mintAddress.slice(-4)}pump\`\n\n` +
       `💰 You'll earn 90% of all trading fees.\n` +
       `📊 [Track & claim fees →](${appUrl}/dashboard)`,
       { 
@@ -539,17 +522,13 @@ await prisma.token.create({
   }
 }
 
-// Export a function that returns the bot after initialization
 export async function getBot() {
   await initializeBot()
   return bot
 }
 
-// For backward compatibility, also export the bot but warn
-// This ensures any existing imports still work
 export default bot
 
-// Also export a helper to check if bot is ready
 export async function isBotReady() {
   try {
     await initializeBot()
