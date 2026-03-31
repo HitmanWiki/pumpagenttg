@@ -353,15 +353,20 @@ bot.command('launch', async (ctx) => {
 // ============================================================
 // Core launch handler
 // ============================================================
+// ============================================================
+// Core launch handler - REPLACE the entire handleLaunch function
+// ============================================================
 async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) {
   const telegramUser = ctx.from
   if (!telegramUser) return ctx.reply('Could not identify your account.')
 
   console.log('[Launch] Starting launch process for user:', telegramUser.username)
 
+  // Parse the caption
   const lines = caption.split('\n').map(l => l.trim())
   const firstLine = lines[0]
 
+  // Extract name and ticker from first line: "/launch My Token $MTK"
   const launchMatch = firstLine.match(/^\/launch\s+(.+?)\s+\$([A-Za-z]+)$/i)
   if (!launchMatch) {
     return ctx.reply(
@@ -375,6 +380,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
   const tokenName = launchMatch[1].trim()
   const tokenSymbol = launchMatch[2].toUpperCase()
 
+  // Validate
   if (tokenName.length < 2 || tokenName.length > 32) {
     return ctx.reply(`❌ Token name must be 2–32 characters. Got: ${tokenName.length}`)
   }
@@ -382,19 +388,31 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     return ctx.reply(`❌ Ticker must be 2–10 letters. Got: $${tokenSymbol}`)
   }
 
+  // Parse optional description, website, twitter, telegram
   let description = ''
   let website = ''
+  let twitter = ''
+  let telegramLink = ''
+
   for (const line of lines.slice(1)) {
-    if (line.toLowerCase().startsWith('description:')) {
+    const lowerLine = line.toLowerCase()
+    if (lowerLine.startsWith('description:')) {
       description = line.replace(/^description:\s*/i, '').trim()
     }
-    if (line.toLowerCase().startsWith('website:')) {
+    else if (lowerLine.startsWith('website:')) {
       website = line.replace(/^website:\s*/i, '').trim()
+    }
+    else if (lowerLine.startsWith('twitter:')) {
+      twitter = line.replace(/^twitter:\s*/i, '').trim()
+    }
+    else if (lowerLine.startsWith('telegram:')) {
+      telegramLink = line.replace(/^telegram:\s*/i, '').trim()
     }
   }
 
-  console.log('[Launch] Token details:', { tokenName, tokenSymbol, description, website })
+  console.log('[Launch] Token details:', { tokenName, tokenSymbol, description, website, twitter, telegramLink })
 
+  // Get photo
   const photos = photoOverride || ctx.message?.photo
   if (!photos || photos.length === 0) {
     return ctx.reply(
@@ -403,12 +421,14 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     )
   }
 
+  // Send initial "processing" message
   const statusMsg = await ctx.reply(
     `⏳ *Launching ${tokenName} ($${tokenSymbol})...*\n\nUploading to IPFS...`,
     { parse_mode: 'Markdown' }
   )
 
   try {
+    // Download the largest photo
     const photo = photos[photos.length - 1]
     const file = await ctx.api.getFile(photo.file_id)
     const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
@@ -417,6 +437,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     const imageRes = await fetch(fileUrl)
     const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
 
+    // Upsert user in DB
     const user = await prisma.user.upsert({
       where: { telegramId: BigInt(telegramUser.id) },
       update: {
@@ -432,11 +453,14 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       },
     })
 
+    // Generate token keypair (this IS the token's mint address)
     const mintKeypair = Keypair.generate()
+    // Generate a separate wallet for fee accumulation
     const feeWallet = generateTokenWallet()
 
     console.log('[Launch] Mint address:', mintKeypair.publicKey.toBase58())
 
+    // Update status message
     await ctx.api.editMessageText(
       ctx.chat!.id,
       statusMsg.message_id,
@@ -444,13 +468,15 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
       { parse_mode: 'Markdown' }
     )
 
+    // Deploy the token
     console.log('[Launch] Calling deployToken...')
     const deployResult = await deployToken({
       name: tokenName,
       symbol: tokenSymbol,
       description,
       website,
-      telegram: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}`,
+      twitter,
+      telegram: telegramLink || `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}`,
       imageBuffer,
       imageFileName: `${tokenSymbol.toLowerCase()}.png`,
       mintKeypair,
@@ -474,6 +500,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     // Extract image URL from metadata or use the one from deploy result
     const imageUrl = deployResult.imageUrl
 
+    // Save token to DB
     await prisma.token.create({
       data: {
         userId: user.id,
@@ -495,6 +522,7 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
 
+    // Success message
     await ctx.api.editMessageText(
       ctx.chat!.id,
       statusMsg.message_id,
@@ -521,7 +549,6 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     ).catch(() => {})
   }
 }
-
 export async function getBot() {
   await initializeBot()
   return bot
