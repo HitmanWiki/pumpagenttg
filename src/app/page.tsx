@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Nav from '../app/components/Nav'
+import Footer from '../app/components/Footer'
 import './globals.css'
 
 const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'pumpagenttg_bot'
@@ -121,105 +122,85 @@ export default function HomePage() {
         <Nav />
 
         {/* Hero */}
-        <div className="hero-grid">
-          <div>
-            {/* Logo at top of hero */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-              <div style={{ 
-                width: '60px', 
-                height: '60px', 
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #00C896, #00A67E)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '24px',
-                fontWeight: 'bold',
-                color: '#030f07'
-              }}>
-                PA
-              </div>
-              <div>
-                <div className="badge fade-up-1" style={{ marginBottom: '0.5rem' }}>
-                  <span className="badge-dot" /> Pump Agent v1.0
-                </div>
-              </div>
-            </div>
-            
-            <div className="badge fade-up-1" style={{ marginBottom: '1.75rem' }}>
-              <span className="badge-dot" /> Live on Solana · pump.fun
-            </div>
-            
-            <h1 className="hero-title fade-up-2">
-              Launch Tokens<br />
-              <span className="accent">with a Telegram</span><br />
-              <span className="stroke">Message.</span>
-            </h1>
-            
-            <p className="hero-sub fade-up-3">
-              DM our bot, attach an image, type /launch — your token goes live on pump.fun in under 2 seconds. No code. No wallets. No complexity.
-            </p>
-            
-            {/* CA Section */}
-            <div className="fade-up-3" style={{ 
-              background: 'rgba(0,200,150,0.05)', 
-              border: '1px solid rgba(0,200,150,0.15)',
-              borderRadius: '12px',
-              padding: '0.75rem 1rem',
-              marginBottom: '1.5rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              flexWrap: 'wrap'
-            }}>
-              <span style={{ fontSize: '0.75rem', color: '#5a7264', fontFamily: 'DM Mono, monospace' }}>
-                🔗 Pump Agent CA:
-              </span>
-              <code style={{ 
-                background: '#0b110d', 
-                padding: '0.25rem 0.75rem', 
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                color: '#00C896',
-                fontFamily: 'DM Mono, monospace'
-              }}>
-                7fZK58DP9xVhLpY8kRvHn2qWxJmK3bNcVpLqWrXyZ
-              </code>
-              <button 
-                onClick={() => {
-                  navigator.clipboard.writeText('7fZK58DP9xVhLpY8kRvHn2qWxJmK3bNcVpLqWrXyZ')
-                  alert('CA copied to clipboard!')
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#00C896',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
-                }}
-              >
-                📋 Copy
-              </button>
-            </div>
-            
-            <div className="hero-ctas fade-up-4">
-              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
-                <TgIcon /> Open Telegram Bot
-              </a>
-              <Link href="/leaderboard" className="btn-ghost">View Leaderboard →</Link>
-            </div>
-            
-            <div className="hero-meta fade-up-4">
-              <span>⚡ &lt;2s deploy</span>
-              <span>🔒 Non-custodial</span>
-              <span>🌍 No KYC</span>
-            </div>
-          </div>
-          <div className="fade-up-2"><Terminal /></div>
-        </div>
+        {/* Hero */}
+<div className="hero-grid">
+  <div>
+    {/* Remove the logo div at top */}
+    
+    <div className="badge fade-up-1" style={{ marginBottom: '1.75rem' }}>
+      <span className="badge-dot" /> Live on Solana · pump.fun
+    </div>
+    
+    <h1 className="hero-title fade-up-2">
+      Launch Tokens<br />
+      <span className="accent">with a Telegram</span><br />
+      <span className="stroke">Message.</span>
+    </h1>
+    
+    <p className="hero-sub fade-up-3">
+      DM our bot, attach an image, type /launch — your token goes live on pump.fun in under 2 seconds. No code. No wallets. No complexity.
+    </p>
+    
+    {/* CA Section */}
+    <div className="fade-up-3" style={{ 
+      background: 'rgba(0,200,150,0.05)', 
+      border: '1px solid rgba(0,200,150,0.15)',
+      borderRadius: '12px',
+      padding: '0.75rem 1rem',
+      marginBottom: '1.5rem',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      flexWrap: 'wrap'
+    }}>
+      <span style={{ fontSize: '0.75rem', color: '#5a7264', fontFamily: 'DM Mono, monospace' }}>
+        🔗 Pump Agent CA:
+      </span>
+      <code style={{ 
+        background: '#0b110d', 
+        padding: '0.25rem 0.75rem', 
+        borderRadius: '6px',
+        fontSize: '0.75rem',
+        color: '#00C896',
+        fontFamily: 'DM Mono, monospace'
+      }}>
+        7fZK58DP9xVhLpY8kRvHn2qWxJmK3bNcVpLqWrXyZ
+      </code>
+      <button 
+        onClick={() => {
+          navigator.clipboard.writeText('7fZK58DP9xVhLpY8kRvHn2qWxJmK3bNcVpLqWrXyZ')
+          alert('CA copied to clipboard!')
+        }}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: '#00C896',
+          cursor: 'pointer',
+          fontSize: '0.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem'
+        }}
+      >
+        📋 Copy
+      </button>
+    </div>
+    
+    <div className="hero-ctas fade-up-4">
+      <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
+        <TgIcon /> Open Telegram Bot
+      </a>
+      <Link href="/leaderboard" className="btn-ghost">View Leaderboard →</Link>
+    </div>
+    
+    <div className="hero-meta fade-up-4">
+      <span>⚡ &lt;2s deploy</span>
+      <span>🔒 Non-custodial</span>
+      <span>🌍 No KYC</span>
+    </div>
+  </div>
+  <div className="fade-up-2"><Terminal /></div>
+</div>
 
         {/* Stats */}
         <div className="stats-section">
@@ -378,35 +359,35 @@ export default function HomePage() {
         </div>
 
         {/* Footer */}
-        <div style={{ borderTop: '1px solid rgba(0,200,150,0.06)' }}>
-          <div className="footer-inner">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ 
-                width: '28px', 
-                height: '28px', 
-                borderRadius: '6px',
-                background: '#00C896',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                color: '#030f07'
-              }}>
-                PA
-              </div>
-              <div className="footer-copy">
-                © {new Date().getFullYear()} Pump Agent · Built on Solana · Non-custodial · No KYC
-              </div>
-            </div>
-            <div className="footer-links">
-              <Link href="/leaderboard" className="footer-link">Leaderboard</Link>
-              <Link href="/tokens" className="footer-link">All Tokens</Link>
-              <Link href="/dashboard" className="footer-link">Dashboard</Link>
-              <a href={tgLink} target="_blank" rel="noopener noreferrer" className="footer-link">Telegram</a>
-            </div>
-          </div>
-        </div>
+<div style={{ borderTop: '1px solid rgba(0,200,150,0.06)' }}>
+  <div className="footer-inner">
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ 
+        width: '28px', 
+        height: '28px', 
+        borderRadius: '6px',
+        background: '#00C896',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        color: '#030f07'
+      }}>
+        PA
+      </div>
+      <div className="footer-copy">
+        © {new Date().getFullYear()} Pump Agent · Built on Solana · Non-custodial · No KYC
+      </div>
+    </div>
+    <div className="footer-links">
+      <Link href="/leaderboard" className="footer-link">Leaderboard</Link>
+      <Link href="/tokens" className="footer-link">All Tokens</Link>
+      <Link href="/dashboard" className="footer-link">Dashboard</Link>
+      <a href={tgLink} target="_blank" rel="noopener noreferrer" className="footer-link">Telegram</a>
+    </div>
+  </div>
+</div>
       </div>
     </>
   )
