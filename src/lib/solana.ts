@@ -1,4 +1,4 @@
-// src/lib/solana.ts - Fix the Buffer to Blob conversion
+// src/lib/solana.ts
 import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
 import bs58 from 'bs58'
 
@@ -44,7 +44,7 @@ export async function getSolBalance(publicKey: string): Promise<number> {
 
 // Helper function to convert Buffer to Blob
 function bufferToBlob(buffer: Buffer, mimeType: string): Blob {
-  // Convert Buffer to Uint8Array first
+  // Convert Buffer to Uint8Array first, which is a valid BlobPart
   const uint8Array = new Uint8Array(buffer)
   return new Blob([uint8Array], { type: mimeType })
 }
@@ -110,7 +110,9 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 
     const ipfsData = await ipfsResponse.json()
     const metadataUri = ipfsData.metadataUri || ipfsData.uri
-    const imageUri = ipfsData.imageUri || ipfsData.image_url
+    
+    // Get the image URL from the metadata
+    const imageUrl = metadataUri?.replace('/metadata.json', '/image.png')
 
     if (!metadataUri) {
       console.error('[deployToken] No metadata URI in response:', ipfsData)
@@ -118,10 +120,15 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     }
 
     console.log('[deployToken] Metadata URI:', metadataUri)
-    console.log('[deployToken] Image URI:', imageUri)
+    console.log('[deployToken] Image URL:', imageUrl)
 
     // Step 2: Deploy via PumpPortal API
-    const mintPublicKey = mintKeypair.publicKey.toBase58()
+    // IMPORTANT: mint field should be the base58 encoded SECRET KEY, not public key!
+    const mintSecretKey = bs58.encode(mintKeypair.secretKey)
+    const apiKey = process.env.PUMPPORTAL_API_KEY
+    
+    console.log('[deployToken] API Key exists:', !!apiKey)
+    console.log('[deployToken] Mint public key:', mintKeypair.publicKey.toBase58())
     
     const deployPayload = {
       action: 'create',
@@ -130,7 +137,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
         symbol: symbol,
         uri: metadataUri,
       },
-      mint: mintPublicKey,
+      mint: mintSecretKey,  // Use SECRET KEY, not public key!
       denominatedInSol: 'true',
       amount: devBuySol.toString(),
       slippage: 10,
@@ -138,13 +145,13 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
       pool: 'pump',
     }
 
-    console.log('[deployToken] Deploying with payload:', JSON.stringify(deployPayload, null, 2))
+    console.log('[deployToken] Deploying with payload...')
     
-    const deployResponse = await fetch('https://pumpportal.fun/api/trade', {
+    // API key as query parameter (as per their documentation)
+    const deployResponse = await fetch(`https://pumpportal.fun/api/trade?api-key=${apiKey}`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'x-api-key': process.env.PUMPPORTAL_API_KEY || ''
       },
       body: JSON.stringify(deployPayload),
     })
@@ -158,7 +165,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     const deployData = await deployResponse.json()
     console.log('[deployToken] Deploy response:', deployData)
 
-    const txSignature = deployData.signature || deployData.txid || deployData.transactionId
+    const txSignature = deployData.signature
     
     if (!txSignature) {
       console.warn('[deployToken] No transaction signature in response')
@@ -166,12 +173,9 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 
     const mintAddress = mintKeypair.publicKey.toBase58()
     const pumpFunUrl = `https://pump.fun/coin/${mintAddress}`
-    
-    // Get the image URL from IPFS
-    const imageUrl = imageUri || `https://ipfs.io/ipfs/${metadataUri.split('/ipfs/')[1]?.split('/')[0]}/image.png`
 
     console.log('[deployToken] Success! Token at:', pumpFunUrl)
-    console.log('[deployToken] Image URL:', imageUrl)
+    console.log('[deployToken] Transaction:', `https://solscan.io/tx/${txSignature}`)
 
     return {
       success: true,
