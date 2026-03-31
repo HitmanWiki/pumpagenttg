@@ -74,6 +74,8 @@ export interface DeployTokenResult {
   error?: string
 }
 
+// src/lib/solana.ts - Update the deployToken function
+
 export async function deployToken(params: DeployTokenParams): Promise<DeployTokenResult> {
   const {
     name, symbol, description, website, telegram,
@@ -85,8 +87,6 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     
     // Step 1: Upload metadata + image to IPFS via pump.fun
     const formData = new FormData()
-    
-    // Convert Buffer to Blob using helper function
     const imageBlob = bufferToBlob(imageBuffer, 'image/png')
     formData.append('file', imageBlob, imageFileName)
     formData.append('name', name)
@@ -110,9 +110,6 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 
     const ipfsData = await ipfsResponse.json()
     const metadataUri = ipfsData.metadataUri || ipfsData.uri
-    
-    // Get the image URL from the metadata
-    const imageUrl = metadataUri?.replace('/metadata.json', '/image.png')
 
     if (!metadataUri) {
       console.error('[deployToken] No metadata URI in response:', ipfsData)
@@ -120,10 +117,21 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     }
 
     console.log('[deployToken] Metadata URI:', metadataUri)
-    console.log('[deployToken] Image URL:', imageUrl)
+
+    // Fetch the metadata to get the actual image URL
+    let imageUrl = null
+    try {
+      const metadataResponse = await fetch(metadataUri)
+      const metadata = await metadataResponse.json()
+      imageUrl = metadata.image
+      console.log('[deployToken] Extracted image URL from metadata:', imageUrl)
+    } catch (err) {
+      console.error('[deployToken] Failed to fetch metadata, using fallback:', err)
+      // Fallback: construct image URL from metadata URI
+      imageUrl = metadataUri.replace('/metadata.json', '/image.png')
+    }
 
     // Step 2: Deploy via PumpPortal API
-    // IMPORTANT: mint field should be the base58 encoded SECRET KEY, not public key!
     const mintSecretKey = bs58.encode(mintKeypair.secretKey)
     const apiKey = process.env.PUMPPORTAL_API_KEY
     
@@ -137,7 +145,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
         symbol: symbol,
         uri: metadataUri,
       },
-      mint: mintSecretKey,  // Use SECRET KEY, not public key!
+      mint: mintSecretKey,
       denominatedInSol: 'true',
       amount: devBuySol.toString(),
       slippage: 10,
@@ -147,7 +155,6 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 
     console.log('[deployToken] Deploying with payload...')
     
-    // API key as query parameter (as per their documentation)
     const deployResponse = await fetch(`https://pumpportal.fun/api/trade?api-key=${apiKey}`, {
       method: 'POST',
       headers: { 
@@ -176,13 +183,14 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
 
     console.log('[deployToken] Success! Token at:', pumpFunUrl)
     console.log('[deployToken] Transaction:', `https://solscan.io/tx/${txSignature}`)
+    console.log('[deployToken] Final Image URL being saved:', imageUrl)
 
     return {
       success: true,
       mintAddress,
       txSignature,
       pumpFunUrl,
-      imageUrl,
+      imageUrl,  // This will be the actual image URL like https://ipfs.io/ipfs/QmaMVzeEtmRkzJKYeE5rDrnv73EzB5nCyKDhKJT6rGnhXt
     }
   } catch (error: any) {
     console.error('[deployToken] Error:', error)
