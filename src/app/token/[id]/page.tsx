@@ -6,7 +6,16 @@ import Nav from '../../components/Nav'
 import Footer from '../../components/Footer'
 
 function sol(l: number) { return (l / 1e9).toFixed(4) }
-function shortAddr(a: string, n = 10) { return a ? `${a.slice(0, n)}...${a.slice(-n)}pump` : '' }
+
+// Regular address formatter (no pump suffix)
+function formatAddress(a: string, n = 10) { 
+  return a ? `${a.slice(0, n)}...${a.slice(-n)}` : '' 
+}
+
+// Mint address formatter (with pump suffix)
+function formatMintAddress(a: string) { 
+  return a ? `${a.slice(0, 8)}...${a.slice(-4)}pump` : '' 
+}
 
 export default function TokenDetailPage() {
   const { id } = useParams()
@@ -18,7 +27,6 @@ export default function TokenDetailPage() {
     fetch(`/api/tokens/${id}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        // The API returns { token: {...} } or directly the token
         setToken(d?.token || d)
         setLoading(false)
       })
@@ -57,14 +65,14 @@ export default function TokenDetailPage() {
   const createdFull = new Date(token.createdAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   const createdShort = new Date(token.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   
-  // Get image URL
   const imageUrl = token.imageUrl || (token.metadataUri ? `https://ipfs.io/ipfs/${token.metadataUri.split('/ipfs/')[1]?.split('/')[0]}/image.png` : null)
 
+  // On-chain rows with proper formatting
   const onchainRows = [
-    { label: 'Mint Address', value: token.mintAddress, solscan: `https://solscan.io/account/${token.mintAddress}` },
-    { label: 'Token Wallet', value: token.tokenWalletAddress, solscan: `https://solscan.io/account/${token.tokenWalletAddress}` },
-    { label: 'Deploy Tx', value: token.deployTx, solscan: token.deployTx ? `https://solscan.io/tx/${token.deployTx}` : null },
-    { label: 'pump.fun URL', value: token.pumpFunUrl, link: token.pumpFunUrl },
+    { label: 'Mint Address', value: token.mintAddress, displayValue: formatMintAddress(token.mintAddress), solscan: `https://solscan.io/account/${token.mintAddress}`, isMint: true },
+    { label: 'Token Wallet', value: token.tokenWalletAddress, displayValue: formatAddress(token.tokenWalletAddress, 10), solscan: `https://solscan.io/account/${token.tokenWalletAddress}` },
+    { label: 'Deploy Tx', value: token.deployTx, displayValue: formatAddress(token.deployTx, 12), solscan: token.deployTx ? `https://solscan.io/tx/${token.deployTx}` : null },
+    { label: 'pump.fun URL', value: token.pumpFunUrl, displayValue: token.pumpFunUrl?.slice(0, 50) + '...', link: token.pumpFunUrl },
   ].filter(r => r.value)
 
   return (
@@ -161,10 +169,10 @@ export default function TokenDetailPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {row.link ? (
                     <a href={row.link} target="_blank" rel="noopener noreferrer" className="mono text-green" style={{ fontSize: '0.75rem', textDecoration: 'none', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.value?.slice(0, 50)}{row.value?.length > 50 ? '...' : ''}
+                      {row.displayValue}
                     </a>
                   ) : (
-                    <span className="mono" style={{ fontSize: '0.75rem', color: '#a0b0a6' }}>{shortAddr(row.value)}</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', color: '#a0b0a6' }}>{row.displayValue}</span>
                   )}
                   <button onClick={() => copy(row.value, row.label)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copied === row.label ? '#00C896' : '#5a7264', fontSize: '0.875rem', padding: '0.2rem', transition: 'color 0.2s' }}>
                     {copied === row.label ? '✓' : '⧉'}
