@@ -1,0 +1,21 @@
+{
+  "name": "Pump Agent",
+  "short_name": "PumpAgent",
+  "description": "Launch tokens on pump.fun directly from Telegram",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#00C896",
+  "background_color": "#060a08",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
