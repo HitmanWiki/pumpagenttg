@@ -501,24 +501,28 @@ async function handleLaunch(ctx: Context, caption: string, photoOverride?: any) 
     const imageUrl = deployResult.imageUrl
 
     // Save token to DB
-    await prisma.token.create({
-      data: {
-        userId: user.id,
-        name: tokenName,
-        symbol: tokenSymbol,
-        description: description || null,
-        website: website || null,
-        imageUrl: imageUrl,
-        mintAddress: deployResult.mintAddress,
-        tokenWalletAddress: feeWallet.publicKey,
-        tokenWalletPrivKey: feeWallet.privateKey,
-        deployTx: deployResult.txSignature || null,
-        pumpFunUrl: deployResult.pumpFunUrl || null,
-        status: 'LIVE',
-        telegramChatId: BigInt(ctx.chat!.id),
-        telegramMessageId: BigInt(statusMsg.message_id),
-      }
-    })
+    // Save token to DB
+// In bot.ts, update the token creation section
+await prisma.token.create({
+  data: {
+    userId: user.id,
+    name: tokenName,
+    symbol: tokenSymbol,
+    description: description || null,
+    website: website || null,
+    twitter: twitter || null,      // Add this line
+    telegram: telegramLink || null, // Add this line
+    imageUrl: imageUrl,
+    mintAddress: deployResult.mintAddress,
+    tokenWalletAddress: feeWallet.publicKey,
+    tokenWalletPrivKey: feeWallet.privateKey,
+    deployTx: deployResult.txSignature || null,
+    pumpFunUrl: deployResult.pumpFunUrl || null,
+    status: 'LIVE',
+    telegramChatId: BigInt(ctx.chat!.id),
+    telegramMessageId: BigInt(statusMsg.message_id),
+  }
+})
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pumpagenttg.vercel.app'
 

@@ -6,13 +6,9 @@ import Nav from '../../components/Nav'
 import Footer from '../../components/Footer'
 
 function sol(l: number) { return (l / 1e9).toFixed(4) }
-
-// Regular address formatter (no pump suffix)
 function formatAddress(a: string, n = 10) { 
   return a ? `${a.slice(0, n)}...${a.slice(-n)}` : '' 
 }
-
-// Mint address formatter (with pump suffix)
 function formatMintAddress(a: string) { 
   return a ? `${a.slice(0, 8)}...${a.slice(-4)}pump` : '' 
 }
@@ -67,9 +63,15 @@ export default function TokenDetailPage() {
   
   const imageUrl = token.imageUrl || (token.metadataUri ? `https://ipfs.io/ipfs/${token.metadataUri.split('/ipfs/')[1]?.split('/')[0]}/image.png` : null)
 
-  // On-chain rows with proper formatting
+  // Social links array
+  const socialLinks = [
+    { name: 'Website', url: token.website, icon: '🌐' },
+    { name: 'Twitter', url: token.twitter, icon: '🐦' },
+    { name: 'Telegram', url: token.telegram, icon: '💬' },
+  ].filter(link => link.url)
+
   const onchainRows = [
-    { label: 'Mint Address', value: token.mintAddress, displayValue: formatMintAddress(token.mintAddress), solscan: `https://solscan.io/account/${token.mintAddress}`, isMint: true },
+    { label: 'Mint Address', value: token.mintAddress, displayValue: formatMintAddress(token.mintAddress), solscan: `https://solscan.io/account/${token.mintAddress}` },
     { label: 'Token Wallet', value: token.tokenWalletAddress, displayValue: formatAddress(token.tokenWalletAddress, 10), solscan: `https://solscan.io/account/${token.tokenWalletAddress}` },
     { label: 'Deploy Tx', value: token.deployTx, displayValue: formatAddress(token.deployTx, 12), solscan: token.deployTx ? `https://solscan.io/tx/${token.deployTx}` : null },
     { label: 'pump.fun URL', value: token.pumpFunUrl, displayValue: token.pumpFunUrl?.slice(0, 50) + '...', link: token.pumpFunUrl },
@@ -137,6 +139,44 @@ export default function TokenDetailPage() {
                 <a href={token.pumpFunUrl} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">↗ pump.fun</a>
               )}
             </div>
+
+            {/* Social Links Section */}
+            {socialLinks.length > 0 && (
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap', paddingTop: '1rem', borderTop: '1px solid rgba(0,200,150,0.06)' }}>
+                {socialLinks.map(link => (
+                  <a
+                    key={link.name}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.4rem 0.8rem',
+                      background: 'rgba(0,200,150,0.05)',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      color: '#00C896',
+                      textDecoration: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(0,200,150,0.1)'
+                      e.currentTarget.style.transform = 'translateY(-1px)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(0,200,150,0.05)'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                    }}
+                  >
+                    <span>{link.icon}</span>
+                    <span>{link.name}</span>
+                    <span>↗</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Stats row */}
