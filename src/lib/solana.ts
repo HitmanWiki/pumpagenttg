@@ -58,7 +58,7 @@ async function uploadToIPFS(
   telegram: string,
   imageBuffer: Buffer,
   imageFileName: string
-): Promise<{ metadataUri: string; imageUrl: string }> {
+): Promise<{ metadataUri: string; imageUri: string }> {
   const formData = new FormData()
   const imageBlob = bufferToBlob(imageBuffer, 'image/png')
   formData.append('file', imageBlob, imageFileName)
@@ -82,20 +82,23 @@ async function uploadToIPFS(
   }
 
   const ipfsData = await ipfsResponse.json()
+  
+  // Get both URIs from response
   const metadataUri = ipfsData.metadataUri || ipfsData.uri
+  const imageUri = ipfsData.imageUri || ipfsData.image_url
+  
+  console.log('[deployToken] Metadata URI:', metadataUri)
+  console.log('[deployToken] Image URI:', imageUri)
   
   if (!metadataUri) {
     throw new Error('No metadata URI returned from IPFS')
   }
+  
+  if (!imageUri) {
+    throw new Error('No image URI returned from IPFS')
+  }
 
-  // Construct the image URL - pump.fun stores image at same CID with /image.png
-  const imageCid = metadataUri.split('/ipfs/')[1]?.split('/')[0]
-  const imageUrl = `https://ipfs.io/ipfs/${imageCid}/image.png`
-
-  console.log('[deployToken] Metadata URI:', metadataUri)
-  console.log('[deployToken] Constructed Image URL:', imageUrl)
-
-  return { metadataUri, imageUrl }
+  return { metadataUri, imageUri }
 }
 
 // Helper to get image URL from metadata with retry logic (fallback)
@@ -134,7 +137,6 @@ async function getImageUrlFromMetadata(metadataUri: string, retries: number = 3)
           return metadata.image
         } else if (metadata.image) {
           console.log('[deployToken] Found image in metadata but not PNG:', metadata.image)
-          // Use constructed URL instead
           return constructedUrl
         } else {
           console.log('[deployToken] No image field in metadata, using constructed URL')
@@ -153,7 +155,6 @@ async function getImageUrlFromMetadata(metadataUri: string, retries: number = 3)
     }
   }
   
-  // All retries failed, use constructed URL
   console.warn('[deployToken] All metadata fetch attempts failed, using constructed image URL:', constructedUrl)
   return constructedUrl
 }
@@ -194,29 +195,31 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
     console.log('[deployToken] Starting deployment for:', name, symbol)
     
     // Step 1: Upload metadata to IPFS and get both URIs
-    const { metadataUri, imageUrl: constructedImageUrl } = await uploadToIPFS(
+    const { metadataUri, imageUri } = await uploadToIPFS(
       name, symbol, description || '', website || '', twitter || '', telegram || '',
       imageBuffer, imageFileName
     )
 
-    // Step 2: Try to get image URL from metadata, fallback to constructed URL
-    let imageUrl = await getImageUrlFromMetadata(metadataUri)
+    // Step 2: Use the image URI directly from upload response
+    let imageUrl: string | undefined = imageUri
     
-    // If the image URL from metadata is invalid or returns 404, use constructed URL
+    // If imageUri is missing, try to get from metadata or construct
+    if (!imageUrl) {
+      const fallbackUrl = await getImageUrlFromMetadata(metadataUri)
+      imageUrl = fallbackUrl || undefined
+    }
+    
+    // Verify the image URL is accessible (optional quick check)
     if (imageUrl) {
-      // Verify the image URL is accessible (quick check)
       try {
         const checkResponse = await fetch(imageUrl, { method: 'HEAD' })
         if (!checkResponse.ok) {
-          console.log('[deployToken] Metadata image URL not accessible, using constructed URL')
-          imageUrl = constructedImageUrl
+          console.log('[deployToken] Image URL not accessible, using fallback')
+          imageUrl = undefined
         }
       } catch {
-        console.log('[deployToken] Could not verify metadata image URL, using constructed URL')
-        imageUrl = constructedImageUrl
+        console.log('[deployToken] Could not verify image URL')
       }
-    } else {
-      imageUrl = constructedImageUrl
     }
     
     console.log('[deployToken] Final Image URL:', imageUrl)
@@ -279,7 +282,7 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
       mintAddress,
       txSignature,
       pumpFunUrl,
-      imageUrl: imageUrl || undefined,
+      imageUrl: imageUrl,
     }
   } catch (error: any) {
     console.error('[deployToken] Error:', error)
