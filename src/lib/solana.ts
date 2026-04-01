@@ -92,16 +92,64 @@ async function uploadToIPFS(
   return metadataUri
 }
 
-// Helper to get image URL from metadata
-async function getImageUrlFromMetadata(metadataUri: string): Promise<string | null> {
-  try {
-    const metadataResponse = await fetch(metadataUri)
-    const metadata = await metadataResponse.json()
-    return metadata.image || null
-  } catch (err) {
-    console.error('[deployToken] Failed to fetch metadata:', err)
-    return metadataUri.replace('/metadata.json', '/image.png')
+// Helper to get image URL from metadata with retry logic
+async function getImageUrlFromMetadata(metadataUri: string, retries: number = 3): Promise<string | null> {
+  let lastError: Error | null = null
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`[deployToken] Fetching metadata (attempt ${attempt}/${retries})...`)
+      
+      // Add delay between retries (1s, 2s, 3s)
+      if (attempt > 1) {
+        const delay = attempt * 1000
+        console.log(`[deployToken] Waiting ${delay}ms before retry...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+      
+      const metadataResponse = await fetch(metadataUri, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0'
+        }
+      })
+      
+      if (!metadataResponse.ok) {
+        throw new Error(`HTTP ${metadataResponse.status}: ${metadataResponse.statusText}`)
+      }
+      
+      const text = await metadataResponse.text()
+      
+      // Check if response is valid JSON
+      try {
+        const metadata = JSON.parse(text)
+        
+        if (metadata.image) {
+          console.log('[deployToken] Successfully extracted image URL:', metadata.image)
+          return metadata.image
+        } else {
+          console.log('[deployToken] No image field in metadata, using fallback')
+          return metadataUri.replace('/metadata.json', '/image.png')
+        }
+      } catch (parseError) {
+        // If response is HTML (like from IPFS gateway error), throw and retry
+        if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+          throw new Error('IPFS gateway returned HTML, content not ready yet')
+        }
+        throw parseError
+      }
+      
+    } catch (err) {
+      // Properly handle unknown error type
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      lastError = err instanceof Error ? err : new Error(errorMessage)
+      console.error(`[deployToken] Metadata fetch attempt ${attempt} failed:`, errorMessage)
+    }
   }
+  
+  // All retries failed, use fallback
+  console.warn('[deployToken] All metadata fetch attempts failed, using fallback image URL')
+  return metadataUri.replace('/metadata.json', '/image.png')
 }
 
 // ============================================================
@@ -145,9 +193,9 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
       imageBuffer, imageFileName
     )
 
-    // Step 2: Get the actual image URL from metadata
+    // Step 2: Get the actual image URL from metadata (with retries)
     const imageUrl = await getImageUrlFromMetadata(metadataUri)
-    console.log('[deployToken] Image URL:', imageUrl)
+    console.log('[deployToken] Final Image URL:', imageUrl)
 
     // Step 3: Deploy via PumpPortal API
     const mintSecretKey = bs58.encode(mintKeypair.secretKey)
