@@ -164,11 +164,11 @@ export default function HomePage() {
         color: '#00C896',
         fontFamily: 'DM Mono, monospace'
       }}>
-        7fZK58DP9xVhLpY8kRvHn2qWxJmK3bNcVpLqWrXyZ
+        GGH8RjuFcbbjErgnKK5hLWX5XtRDNgvidosWpW6Epump
       </code>
       <button 
         onClick={() => {
-          navigator.clipboard.writeText('7fZK58DP9xVhLpY8kRvHn2qWxJmK3bNcVpLqWrXyZ')
+          navigator.clipboard.writeText('GGH8RjuFcbbjErgnKK5hLWX5XtRDNgvidosWpW6Epump')
           alert('CA copied to clipboard!')
         }}
         style={{

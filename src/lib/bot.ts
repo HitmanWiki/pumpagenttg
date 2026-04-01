@@ -159,7 +159,7 @@ bot.command('start', async (ctx) => {
   // Regular start message (no login)
   try {
     await ctx.reply(
-      `👋 *Welcome to Pump Agent!*\n\n` +
+      `👋 *Welcome to PUMPATG!*\n\n` +
       `Launch meme tokens on pump.fun directly from Telegram — no code needed.\n\n` +
       `*How to launch a token:*\n` +
       `1️⃣ Send a photo (your token image)\n` +
