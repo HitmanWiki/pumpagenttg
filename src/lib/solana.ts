@@ -58,7 +58,7 @@ async function uploadToIPFS(
   telegram: string,
   imageBuffer: Buffer,
   imageFileName: string
-): Promise<string> {
+): Promise<{ metadataUri: string; imageUrl: string }> {
   const formData = new FormData()
   const imageBlob = bufferToBlob(imageBuffer, 'image/png')
   formData.append('file', imageBlob, imageFileName)
@@ -88,19 +88,25 @@ async function uploadToIPFS(
     throw new Error('No metadata URI returned from IPFS')
   }
 
+  // Construct the image URL - pump.fun stores image at same CID with /image.png
+  const imageCid = metadataUri.split('/ipfs/')[1]?.split('/')[0]
+  const imageUrl = `https://ipfs.io/ipfs/${imageCid}/image.png`
+
   console.log('[deployToken] Metadata URI:', metadataUri)
-  return metadataUri
+  console.log('[deployToken] Constructed Image URL:', imageUrl)
+
+  return { metadataUri, imageUrl }
 }
 
-// Helper to get image URL from metadata with retry logic
+// Helper to get image URL from metadata with retry logic (fallback)
 async function getImageUrlFromMetadata(metadataUri: string, retries: number = 3): Promise<string | null> {
-  let lastError: Error | null = null
+  const imageCid = metadataUri.split('/ipfs/')[1]?.split('/')[0]
+  const constructedUrl = `https://ipfs.io/ipfs/${imageCid}/image.png`
   
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       console.log(`[deployToken] Fetching metadata (attempt ${attempt}/${retries})...`)
       
-      // Add delay between retries (1s, 2s, 3s)
       if (attempt > 1) {
         const delay = attempt * 1000
         console.log(`[deployToken] Waiting ${delay}ms before retry...`)
@@ -120,19 +126,21 @@ async function getImageUrlFromMetadata(metadataUri: string, retries: number = 3)
       
       const text = await metadataResponse.text()
       
-      // Check if response is valid JSON
       try {
         const metadata = JSON.parse(text)
         
-        if (metadata.image) {
-          console.log('[deployToken] Successfully extracted image URL:', metadata.image)
+        if (metadata.image && metadata.image.includes('.png')) {
+          console.log('[deployToken] Successfully extracted image URL from metadata:', metadata.image)
           return metadata.image
+        } else if (metadata.image) {
+          console.log('[deployToken] Found image in metadata but not PNG:', metadata.image)
+          // Use constructed URL instead
+          return constructedUrl
         } else {
-          console.log('[deployToken] No image field in metadata, using fallback')
-          return metadataUri.replace('/metadata.json', '/image.png')
+          console.log('[deployToken] No image field in metadata, using constructed URL')
+          return constructedUrl
         }
       } catch (parseError) {
-        // If response is HTML (like from IPFS gateway error), throw and retry
         if (text.includes('<!DOCTYPE') || text.includes('<html')) {
           throw new Error('IPFS gateway returned HTML, content not ready yet')
         }
@@ -140,16 +148,14 @@ async function getImageUrlFromMetadata(metadataUri: string, retries: number = 3)
       }
       
     } catch (err) {
-      // Properly handle unknown error type
       const errorMessage = err instanceof Error ? err.message : String(err)
-      lastError = err instanceof Error ? err : new Error(errorMessage)
       console.error(`[deployToken] Metadata fetch attempt ${attempt} failed:`, errorMessage)
     }
   }
   
-  // All retries failed, use fallback
-  console.warn('[deployToken] All metadata fetch attempts failed, using fallback image URL')
-  return metadataUri.replace('/metadata.json', '/image.png')
+  // All retries failed, use constructed URL
+  console.warn('[deployToken] All metadata fetch attempts failed, using constructed image URL:', constructedUrl)
+  return constructedUrl
 }
 
 // ============================================================
@@ -187,14 +193,32 @@ export async function deployToken(params: DeployTokenParams): Promise<DeployToke
   try {
     console.log('[deployToken] Starting deployment for:', name, symbol)
     
-    // Step 1: Upload metadata to IPFS
-    const metadataUri = await uploadToIPFS(
+    // Step 1: Upload metadata to IPFS and get both URIs
+    const { metadataUri, imageUrl: constructedImageUrl } = await uploadToIPFS(
       name, symbol, description || '', website || '', twitter || '', telegram || '',
       imageBuffer, imageFileName
     )
 
-    // Step 2: Get the actual image URL from metadata (with retries)
-    const imageUrl = await getImageUrlFromMetadata(metadataUri)
+    // Step 2: Try to get image URL from metadata, fallback to constructed URL
+    let imageUrl = await getImageUrlFromMetadata(metadataUri)
+    
+    // If the image URL from metadata is invalid or returns 404, use constructed URL
+    if (imageUrl) {
+      // Verify the image URL is accessible (quick check)
+      try {
+        const checkResponse = await fetch(imageUrl, { method: 'HEAD' })
+        if (!checkResponse.ok) {
+          console.log('[deployToken] Metadata image URL not accessible, using constructed URL')
+          imageUrl = constructedImageUrl
+        }
+      } catch {
+        console.log('[deployToken] Could not verify metadata image URL, using constructed URL')
+        imageUrl = constructedImageUrl
+      }
+    } else {
+      imageUrl = constructedImageUrl
+    }
+    
     console.log('[deployToken] Final Image URL:', imageUrl)
 
     // Step 3: Deploy via PumpPortal API
